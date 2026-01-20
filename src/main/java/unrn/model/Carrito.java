@@ -1,4 +1,4 @@
-package main.java.unrn.model;
+package unrn.model;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -12,27 +12,27 @@ public class Carrito {
     static final String ERROR_PELICULA_ID_NULO = "El id de la película no puede ser nulo";
     static final String ERROR_ITEM_NO_ENCONTRADO = "No se encontró un item con el id de película especificado";
 
-    private final List<ItemCarrito> items;
+    private final List<PeliculaEnCarrito> items;
 
     public Carrito() {
         this.items = new ArrayList<>();
     }
 
-    public Carrito(List<ItemCarrito> items) {
+    public Carrito(List<PeliculaEnCarrito> items) {
         assertItemsNoNulos(items);
         this.items = new ArrayList<>(items);
     }
 
-    private void assertItemsNoNulos(List<ItemCarrito> items) {
+    private void assertItemsNoNulos(List<PeliculaEnCarrito> items) {
         if (items == null) {
             throw new RuntimeException(ERROR_ITEMS_NULOS);
         }
     }
 
-    public void agregarPelicula(ItemCarrito nuevoItem) {
+    public void agregarPelicula(PeliculaEnCarrito nuevoItem) {
         assertItemNoNulo(nuevoItem);
 
-        ItemCarrito itemExistente = buscarItemPorPeliculaId(nuevoItem.peliculaId());
+        PeliculaEnCarrito itemExistente = buscarItemPorPeliculaId(nuevoItem.peliculaId());
 
         if (itemExistente != null) {
             itemExistente.incrementarCantidad(nuevoItem.cantidad());
@@ -41,14 +41,14 @@ public class Carrito {
         }
     }
 
-    private void assertItemNoNulo(ItemCarrito item) {
+    private void assertItemNoNulo(PeliculaEnCarrito item) {
         if (item == null) {
             throw new RuntimeException(ERROR_ITEM_NULO);
         }
     }
 
-    private ItemCarrito buscarItemPorPeliculaId(String peliculaId) {
-        for (ItemCarrito item : items) {
+    private PeliculaEnCarrito buscarItemPorPeliculaId(String peliculaId) {
+        for (PeliculaEnCarrito item : items) {
             if (item.correspondeA(peliculaId)) {
                 return item;
             }
@@ -59,7 +59,7 @@ public class Carrito {
     public void eliminarPelicula(String peliculaId) {
         assertPeliculaIdNoNulo(peliculaId);
 
-        ItemCarrito itemAEliminar = buscarItemPorPeliculaId(peliculaId);
+        PeliculaEnCarrito itemAEliminar = buscarItemPorPeliculaId(peliculaId);
 
         if (itemAEliminar == null) {
             throw new RuntimeException(ERROR_ITEM_NO_ENCONTRADO);
@@ -76,13 +76,13 @@ public class Carrito {
 
     public BigDecimal total() {
         BigDecimal total = BigDecimal.ZERO;
-        for (ItemCarrito item : items) {
+        for (PeliculaEnCarrito item : items) {
             total = total.add(item.subtotal());
         }
         return total;
     }
 
-    public List<ItemCarrito> items() {
+    public List<PeliculaEnCarrito> items() {
         return Collections.unmodifiableList(items);
     }
 }

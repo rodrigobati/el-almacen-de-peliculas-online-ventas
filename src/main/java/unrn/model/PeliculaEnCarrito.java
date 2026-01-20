@@ -1,8 +1,8 @@
-package main.java.unrn.model;
+package unrn.model;
 
 import java.math.BigDecimal;
 
-public class ItemCarrito {
+public class PeliculaEnCarrito {
 
     static final String ERROR_PELICULA_ID_NULO = "El id de la película no puede ser nulo";
     static final String ERROR_PELICULA_ID_VACIO = "El id de la película no puede estar vacío";
@@ -18,7 +18,7 @@ public class ItemCarrito {
     private final BigDecimal precioUnitario;
     private int cantidad;
 
-    public ItemCarrito(String peliculaId, String titulo, BigDecimal precioUnitario, int cantidad) {
+    public PeliculaEnCarrito(String peliculaId, String titulo, BigDecimal precioUnitario, int cantidad) {
         assertPeliculaIdNoNulo(peliculaId);
         assertPeliculaIdNoVacio(peliculaId);
         assertTituloNoNulo(titulo);
