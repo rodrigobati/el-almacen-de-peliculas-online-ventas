@@ -8,9 +8,12 @@ import java.util.List;
 public class Carrito {
 
     static final String ERROR_ITEMS_NULOS = "La lista de items no puede ser nula";
-    static final String ERROR_ITEM_NULO = "El item a agregar no puede ser nulo";
+    static final String ERROR_ITEM_NULO = "El item no puede ser nulo";
     static final String ERROR_PELICULA_ID_NULO = "El id de la película no puede ser nulo";
+    static final String ERROR_PELICULA_ID_VACIO = "El id de la película no puede estar vacío";
+    static final String ERROR_CANTIDAD_INVALIDA = "La cantidad debe ser mayor a cero";
     static final String ERROR_ITEM_NO_ENCONTRADO = "No se encontró un item con el id de película especificado";
+    static final String ERROR_PELICULAS_DUPLICADAS = "No se permiten películas duplicadas en el carrito";
 
     private final List<PeliculaEnCarrito> items;
 
@@ -20,6 +23,8 @@ public class Carrito {
 
     public Carrito(List<PeliculaEnCarrito> items) {
         assertItemsNoNulos(items);
+        assertItemsSinNulos(items);
+        assertSinDuplicados(items);
         this.items = new ArrayList<>(items);
     }
 
@@ -29,21 +34,48 @@ public class Carrito {
         }
     }
 
-    public void agregarPelicula(PeliculaEnCarrito nuevoItem) {
-        assertItemNoNulo(nuevoItem);
-
-        PeliculaEnCarrito itemExistente = buscarItemPorPeliculaId(nuevoItem.peliculaId());
-
-        if (itemExistente != null) {
-            itemExistente.incrementarCantidad(nuevoItem.cantidad());
-        } else {
-            items.add(nuevoItem);
+    private void assertItemsSinNulos(List<PeliculaEnCarrito> items) {
+        for (PeliculaEnCarrito item : items) {
+            if (item == null) {
+                throw new RuntimeException(ERROR_ITEM_NULO);
+            }
         }
     }
 
-    private void assertItemNoNulo(PeliculaEnCarrito item) {
-        if (item == null) {
-            throw new RuntimeException(ERROR_ITEM_NULO);
+    private void assertSinDuplicados(List<PeliculaEnCarrito> items) {
+        for (int i = 0; i < items.size(); i++) {
+            for (int j = i + 1; j < items.size(); j++) {
+                PeliculaEnCarrito item1 = items.get(i);
+                PeliculaEnCarrito item2 = items.get(j);
+                if (sonMismaPelicula(item1, item2)) {
+                    throw new RuntimeException(ERROR_PELICULAS_DUPLICADAS);
+                }
+            }
+        }
+    }
+
+    private boolean sonMismaPelicula(PeliculaEnCarrito item1, PeliculaEnCarrito item2) {
+        return item1.esMismaPelicula(item2);
+    }
+
+    public void agregarPelicula(String peliculaId, String titulo, BigDecimal precioUnitario, int cantidad) {
+        assertPeliculaIdNoNulo(peliculaId);
+        assertPeliculaIdNoVacio(peliculaId);
+        assertCantidadValida(cantidad);
+
+        PeliculaEnCarrito itemExistente = buscarItemPorPeliculaId(peliculaId);
+
+        if (itemExistente != null) {
+            itemExistente.incrementarCantidad(cantidad);
+        } else {
+            PeliculaEnCarrito nuevaPelicula = new PeliculaEnCarrito(peliculaId, titulo, precioUnitario, cantidad);
+            items.add(nuevaPelicula);
+        }
+    }
+
+    private void assertCantidadValida(int cantidad) {
+        if (cantidad <= 0) {
+            throw new RuntimeException(ERROR_CANTIDAD_INVALIDA);
         }
     }
 
@@ -58,6 +90,7 @@ public class Carrito {
 
     public void eliminarPelicula(String peliculaId) {
         assertPeliculaIdNoNulo(peliculaId);
+        assertPeliculaIdNoVacio(peliculaId);
 
         PeliculaEnCarrito itemAEliminar = buscarItemPorPeliculaId(peliculaId);
 
@@ -71,6 +104,12 @@ public class Carrito {
     private void assertPeliculaIdNoNulo(String peliculaId) {
         if (peliculaId == null) {
             throw new RuntimeException(ERROR_PELICULA_ID_NULO);
+        }
+    }
+
+    private void assertPeliculaIdNoVacio(String peliculaId) {
+        if (peliculaId.trim().isEmpty()) {
+            throw new RuntimeException(ERROR_PELICULA_ID_VACIO);
         }
     }
 

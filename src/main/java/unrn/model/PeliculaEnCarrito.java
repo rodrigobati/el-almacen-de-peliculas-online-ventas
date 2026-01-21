@@ -12,6 +12,8 @@ public class PeliculaEnCarrito {
     static final String ERROR_PRECIO_INVALIDO = "El precio unitario debe ser mayor a cero";
     static final String ERROR_CANTIDAD_INVALIDA = "La cantidad debe ser mayor a cero";
     static final String ERROR_DELTA_INVALIDO = "El delta para incrementar debe ser mayor a cero";
+    static final String ERROR_PELICULA_DISTINTA = "No se puede absorber una película con diferente id";
+    static final String ERROR_PELICULA_A_ABSORBER_NULA = "La película a absorber no puede ser nula";
 
     private final String peliculaId;
     private final String titulo;
@@ -79,6 +81,13 @@ public class PeliculaEnCarrito {
         return this.peliculaId.equals(peliculaId);
     }
 
+    public boolean esMismaPelicula(PeliculaEnCarrito otra) {
+        if (otra == null) {
+            return false;
+        }
+        return this.peliculaId.equals(otra.peliculaId);
+    }
+
     public void incrementarCantidad(int delta) {
         assertDeltaValido(delta);
         this.cantidad += delta;
@@ -94,19 +103,21 @@ public class PeliculaEnCarrito {
         return precioUnitario.multiply(BigDecimal.valueOf(cantidad));
     }
 
-    public String peliculaId() {
-        return peliculaId;
+    public void absorber(PeliculaEnCarrito otro) {
+        assertPeliculaAAborberNoNula(otro);
+        assertMismaPelicula(otro);
+        this.cantidad += otro.cantidad;
     }
 
-    public String titulo() {
-        return titulo;
+    private void assertPeliculaAAborberNoNula(PeliculaEnCarrito pelicula) {
+        if (pelicula == null) {
+            throw new RuntimeException(ERROR_PELICULA_A_ABSORBER_NULA);
+        }
     }
 
-    public BigDecimal precioUnitario() {
-        return precioUnitario;
-    }
-
-    public int cantidad() {
-        return cantidad;
+    private void assertMismaPelicula(PeliculaEnCarrito otro) {
+        if (!this.peliculaId.equals(otro.peliculaId)) {
+            throw new RuntimeException(ERROR_PELICULA_DISTINTA);
+        }
     }
 }
