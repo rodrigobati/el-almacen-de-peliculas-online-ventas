@@ -109,6 +109,22 @@ public class PeliculaEnCarrito {
         this.cantidad += otro.cantidad;
     }
 
+    public String peliculaId() {
+        return peliculaId;
+    }
+
+    public String titulo() {
+        return titulo;
+    }
+
+    public BigDecimal precioUnitario() {
+        return precioUnitario;
+    }
+
+    public int cantidad() {
+        return cantidad;
+    }
+
     private void assertPeliculaAAborberNoNula(PeliculaEnCarrito pelicula) {
         if (pelicula == null) {
             throw new RuntimeException(ERROR_PELICULA_A_ABSORBER_NULA);
