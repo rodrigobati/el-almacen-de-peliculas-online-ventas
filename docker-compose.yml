@@ -1,0 +1,65 @@
+# ========================================
+# Docker Compose para Vertical de Ventas
+# ========================================
+#
+# Este archivo define la vertical de ventas para el sistema
+# El Almacén de Películas Online.
+#
+# Puede usarse de dos formas:
+# 1) Solo para levantar esta vertical (desarrollo aislado)
+# 2) Integrarse con docker-compose-full.yml del repo principal
+#
+# ========================================
+
+services:
+  ventas-service:
+    build: .
+    container_name: ventas-service
+    environment:
+      # Perfil Spring que usa application-docker.properties
+      SPRING_PROFILES_ACTIVE: docker
+      # Puerto del servicio (debe coincidir con application-docker.properties)
+      SERVER_PORT: 8083
+    ports:
+      # Exponemos el puerto 8083 del contenedor al host
+      - "8083:8083"
+    networks:
+      - almacen-net
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
+
+# ========================================
+# REDES
+# ========================================
+# Red compartida para comunicación entre verticales
+# Si se levanta con docker-compose-full.yml, esta red debe ser "external"
+networks:
+  almacen-net:
+    driver: bridge
+
+# ========================================
+# NOTAS DE INTEGRACIÓN
+# ========================================
+# Para integrar con otras verticales:
+#
+# 1. Asegurar que todas las verticales estén en la misma red (almacen-net)
+# 2. Usar nombres de servicio docker para comunicación:
+#    - catalogo-backend:8080 (catálogo de películas)
+#    - rating-service:8082 (servicio de ratings)
+#    - api-gateway:9500 (gateway principal)
+#
+# 3. Variables de entorno sugeridas para consumir otros servicios:
+#    CATALOGO_URL=http://catalogo-backend:8080
+#    RATING_URL=http://rating-service:8082
+#
+# 4. Para el gateway, agregar ruta en application-docker.yml:
+#    - id: ventas
+#      uri: http://ventas-service:8083
+#      predicates:
+#        - Path=/api/ventas/**,/clientes/**
+#      filters:
+#        - StripPrefix=1

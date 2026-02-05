@@ -1,5 +1,8 @@
 package unrn.service;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import unrn.dto.AgregarPeliculaRequest;
 import unrn.dto.CarritoDTO;
@@ -13,8 +16,7 @@ import java.util.List;
 @Service
 public class CarritoService {
 
-    static final String ERROR_CLIENTE_ID_NULO = "El id del cliente no puede ser nulo";
-    static final String ERROR_CLIENTE_ID_VACIO = "El id del cliente no puede estar vacío";
+    static final String ERROR_USUARIO_NO_AUTENTICADO = "Usuario no autenticado";
     static final String ERROR_REQUEST_NULO = "El request no puede ser nulo";
 
     private final CarritoRepository carritoRepository;
@@ -23,18 +25,15 @@ public class CarritoService {
         this.carritoRepository = carritoRepository;
     }
 
-    public CarritoDTO verCarrito(String clienteId) {
-        assertClienteIdNoNulo(clienteId);
-        assertClienteIdNoVacio(clienteId);
-
+    public CarritoDTO verCarrito() {
+        String clienteId = obtenerClienteIdAutenticado();
         Carrito carrito = carritoRepository.obtenerDe(clienteId);
         return mapearADTO(carrito);
     }
 
-    public CarritoDTO agregarPelicula(String clienteId, AgregarPeliculaRequest request) {
-        assertClienteIdNoNulo(clienteId);
-        assertClienteIdNoVacio(clienteId);
+    public CarritoDTO agregarPelicula(AgregarPeliculaRequest request) {
         assertRequestNoNulo(request);
+        String clienteId = obtenerClienteIdAutenticado();
 
         Carrito carrito = carritoRepository.obtenerDe(clienteId);
         carrito.agregarPelicula(
@@ -47,10 +46,8 @@ public class CarritoService {
         return mapearADTO(carrito);
     }
 
-    public CarritoDTO eliminarPelicula(String clienteId, String peliculaId) {
-        assertClienteIdNoNulo(clienteId);
-        assertClienteIdNoVacio(clienteId);
-
+    public CarritoDTO eliminarPelicula(String peliculaId) {
+        String clienteId = obtenerClienteIdAutenticado();
         Carrito carrito = carritoRepository.obtenerDe(clienteId);
         carrito.eliminarPelicula(peliculaId);
         carritoRepository.guardar(clienteId, carrito);
@@ -58,16 +55,28 @@ public class CarritoService {
         return mapearADTO(carrito);
     }
 
-    private void assertClienteIdNoNulo(String clienteId) {
-        if (clienteId == null) {
-            throw new RuntimeException(ERROR_CLIENTE_ID_NULO);
-        }
-    }
+    private String obtenerClienteIdAutenticado() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
-    private void assertClienteIdNoVacio(String clienteId) {
-        if (clienteId.trim().isEmpty()) {
-            throw new RuntimeException(ERROR_CLIENTE_ID_VACIO);
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new RuntimeException(ERROR_USUARIO_NO_AUTENTICADO);
         }
+
+        // Si es JwtAuthenticationToken, obtener el claim preferred_username
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            String preferredUsername = jwtAuth.getToken().getClaimAsString("preferred_username");
+            if (preferredUsername != null && !preferredUsername.isBlank()) {
+                return preferredUsername;
+            }
+        }
+
+        // Fallback: usar getName()
+        String username = auth.getName();
+        if (username == null || username.isBlank()) {
+            throw new RuntimeException(ERROR_USUARIO_NO_AUTENTICADO);
+        }
+
+        return username;
     }
 
     private void assertRequestNoNulo(AgregarPeliculaRequest request) {

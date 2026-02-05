@@ -78,7 +78,136 @@ Esta vertical **NO** se encarga de:
 ---
 
 **Tecnologías:**  
-Java 23, Maven, MySQL (backend) | React (frontend)
+Java 21, Spring Boot 4.0.1, Maven, H2 Database (desarrollo/docker) | React (frontend)
 
 **Modelo de dominio:**  
 Basado en programación orientada a objetos, sin frameworks en el núcleo del dominio. Las reglas de negocio residen en las entidades y agregados.
+
+---
+
+## Dockerización y Despliegue
+
+### Ejecutar la vertical de forma aislada
+
+Para ejecutar únicamente el servicio de Ventas en un contenedor:
+
+```bash
+# Construir imagen Docker
+docker build -t ventas-service .
+
+# Ejecutar contenedor
+docker run -p 8083:8083 -e SPRING_PROFILES_ACTIVE=docker ventas-service
+```
+
+O usando Docker Compose:
+
+```bash
+docker-compose up --build
+```
+
+### Configuración de red para integración
+
+El servicio de Ventas se ejecuta en el puerto **8083** y se comunica con otras verticales a través de la red Docker `almacen-net`.
+
+**Variables de entorno requeridas:**
+
+| Variable                 | Descripción          | Valor por defecto |
+| ------------------------ | -------------------- | ----------------- |
+| `SPRING_PROFILES_ACTIVE` | Perfil Spring a usar | `docker`          |
+| `SERVER_PORT`            | Puerto del servicio  | `8083`            |
+
+**Puertos expuestos:**
+
+- `8083`: API REST de Ventas (carrito de compras)
+
+### Integración con otras verticales
+
+Para que la vertical de Ventas se comunique correctamente con el resto del ecosistema:
+
+**1. Red compartida**
+
+Todas las verticales deben estar en la misma red Docker (`almacen-net`):
+
+```yaml
+networks:
+  almacen-net:
+    external: true
+```
+
+**2. Nombres de servicio Docker**
+
+Los siguientes nombres de host deben usarse para comunicación interna:
+
+- `catalogo-backend:8080` - Servicio de catálogo de películas
+- `rating-service:8082` - Servicio de ratings y valoraciones
+- `ventas-service:8083` - Este servicio (Ventas)
+- `api-gateway:9500` - Gateway principal (punto de entrada unificado)
+
+**3. Configuración en API Gateway**
+
+Para exponer este servicio a través del gateway, agregar en `application-docker.yml` del gateway:
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: ventas
+          uri: http://ventas-service:8083
+          predicates:
+            - Path=/api/ventas/**,/clientes/**
+          filters:
+            - StripPrefix=1
+```
+
+### Endpoints disponibles
+
+**Base URL (interno):** `http://ventas-service:8083`  
+**Base URL (externo):** `http://localhost:8083`
+
+| Método   | Endpoint                                           | Descripción                   |
+| -------- | -------------------------------------------------- | ----------------------------- |
+| `GET`    | `/clientes/{clienteId}/carrito`                    | Ver carrito del cliente       |
+| `POST`   | `/clientes/{clienteId}/carrito/items`              | Agregar película al carrito   |
+| `DELETE` | `/clientes/{clienteId}/carrito/items/{peliculaId}` | Eliminar película del carrito |
+
+**Ejemplo de uso con curl:**
+
+```bash
+# Ver carrito del cliente
+curl http://localhost:8083/clientes/cliente-001/carrito
+
+# Agregar película al carrito
+curl -X POST http://localhost:8083/clientes/cliente-001/carrito/items \
+  -H "Content-Type: application/json" \
+  -d '{
+    "peliculaId": "pelicula-123",
+    "titulo": "Inception",
+    "precioUnitario": 15.99,
+    "cantidad": 2
+  }'
+
+# Eliminar película del carrito
+curl -X DELETE http://localhost:8083/clientes/cliente-001/carrito/items/pelicula-123
+```
+
+### Healthcheck y monitoreo
+
+Si Spring Boot Actuator está habilitado, el healthcheck está disponible en:
+
+```bash
+curl http://localhost:8083/actuator/health
+```
+
+### Troubleshooting
+
+**Problema:** El servicio no arranca.  
+**Solución:** Verificar logs con `docker logs ventas-service`
+
+**Problema:** No puede comunicarse con otras verticales.  
+**Solución:** Asegurar que todos los servicios estén en la misma red Docker y usar nombres de servicio (no `localhost`)
+
+**Problema:** Error de base de datos.  
+**Solución:** La vertical usa H2 en memoria (stateless). Los datos se pierden al reiniciar el contenedor.
+
+---
