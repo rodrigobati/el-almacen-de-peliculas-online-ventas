@@ -8,14 +8,14 @@
 
 ## 📊 RESUMEN EJECUTIVO
 
-| Aspecto | Resultado | Status |
-|---------|-----------|--------|
-| **Compose usado para gateway** | `docker-compose-workspace.yml` (existente) | ✅ |
-| **Stack del gateway** | `peliculas-workspace` | ✅ |
-| **Gateway status** | `up (healthy)` | ✅ |
-| **Error crítico** | DNS - redes separadas (resuelto) | ✅ |
-| **Resultado health gateway** | `200 OK - {"status":"UP"}` | ✅ |
-| **Resolución JWK desde gateway** | `ok` (200 OK después del fix) | ✅ |
+| Aspecto                          | Resultado                                  | Status |
+| -------------------------------- | ------------------------------------------ | ------ |
+| **Compose usado para gateway**   | `docker-compose-workspace.yml` (existente) | ✅     |
+| **Stack del gateway**            | `peliculas-workspace`                      | ✅     |
+| **Gateway status**               | `up (healthy)`                             | ✅     |
+| **Error crítico**                | DNS - redes separadas (resuelto)           | ✅     |
+| **Resultado health gateway**     | `200 OK - {"status":"UP"}`                 | ✅     |
+| **Resolución JWK desde gateway** | `ok` (200 OK después del fix)              | ✅     |
 
 ---
 
@@ -45,11 +45,11 @@ api-gateway:
   restart: unless-stopped
   depends_on:
     catalogo-backend:
-      condition: service_healthy  # ⚠️ Bloqueante
+      condition: service_healthy # ⚠️ Bloqueante
     rating-service:
-      condition: service_healthy  # ⚠️ Bloqueante
+      condition: service_healthy # ⚠️ Bloqueante
     keycloak:
-      condition: service_healthy  # ⚠️ Bloqueante
+      condition: service_healthy # ⚠️ Bloqueante
   ports:
     - "9500:9500"
   environment:
@@ -160,11 +160,11 @@ Cambiar `condition: service_healthy` → `condition: service_started` en `docker
 ```yaml
 depends_on:
   catalogo-backend:
-    condition: service_started  # ✅ No bloquea
+    condition: service_started # ✅ No bloquea
   rating-service:
-    condition: service_started  # ✅ No bloquea
+    condition: service_started # ✅ No bloquea
   keycloak:
-    condition: service_started  # ✅ No bloquea
+    condition: service_started # ✅ No bloquea
 ```
 
 ### Gateway existente encontrado:
@@ -388,14 +388,14 @@ La **infraestructura está correcta**. Los errores 500 son de validación JWT en
 
 ## 🎯 RESPUESTA FINAL (FORMATO OBLIGATORIO)
 
-| Aspecto | Valor |
-|---------|-------|
-| **Compose usado para gateway** | `docker-compose-workspace.yml` (contenedor existente) |
-| **Stack del gateway** | `peliculas-workspace` |
-| **Gateway status** | `up` ✅ |
-| **Error crítico** | "DNS failure - redes separadas" (resuelto) |
-| **Resultado health gateway** | `200 OK - {"status":"UP"}` |
-| **Resolución JWK desde gateway** | `ok` (200 OK después de conectar redes) |
+| Aspecto                          | Valor                                                 |
+| -------------------------------- | ----------------------------------------------------- |
+| **Compose usado para gateway**   | `docker-compose-workspace.yml` (contenedor existente) |
+| **Stack del gateway**            | `peliculas-workspace`                                 |
+| **Gateway status**               | `up` ✅                                               |
+| **Error crítico**                | "DNS failure - redes separadas" (resuelto)            |
+| **Resultado health gateway**     | `200 OK - {"status":"UP"}`                            |
+| **Resolución JWK desde gateway** | `ok` (200 OK después de conectar redes)               |
 
 ---
 
@@ -469,6 +469,7 @@ io.netty.resolver.dns.DnsErrorCauseException: Query failed with SERVFAIL
 **Solución:**
 
 1. **Opción A (runtime):** Conectar contenedor a múltiples redes:
+
    ```bash
    docker network connect <red-adicional> <contenedor>
    ```
