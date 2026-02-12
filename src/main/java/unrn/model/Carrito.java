@@ -101,6 +101,32 @@ public class Carrito {
         items.remove(itemAEliminar);
     }
 
+    public void decrementarPelicula(String peliculaId) {
+        assertPeliculaIdNoNulo(peliculaId);
+        assertPeliculaIdNoVacio(peliculaId);
+
+        PeliculaEnCarrito item = buscarItemPorPeliculaId(peliculaId);
+
+        if (item == null) {
+            throw new RuntimeException(ERROR_ITEM_NO_ENCONTRADO);
+        }
+
+        if (item.cantidad() <= 1) {
+            items.remove(item);
+            return;
+        }
+
+        item.decrementarCantidad(1);
+    }
+
+    public int cantidadDe(String peliculaId) {
+        assertPeliculaIdNoNulo(peliculaId);
+        assertPeliculaIdNoVacio(peliculaId);
+
+        PeliculaEnCarrito item = buscarItemPorPeliculaId(peliculaId);
+        return item == null ? 0 : item.cantidad();
+    }
+
     private void assertPeliculaIdNoNulo(String peliculaId) {
         if (peliculaId == null) {
             throw new RuntimeException(ERROR_PELICULA_ID_NULO);

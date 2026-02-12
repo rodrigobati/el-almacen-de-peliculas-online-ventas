@@ -9,7 +9,9 @@ import unrn.dto.CarritoDTO;
 import unrn.dto.PeliculaEnCarritoDTO;
 import unrn.model.Carrito;
 import unrn.model.PeliculaEnCarrito;
+import unrn.model.PeliculaProyeccion;
 import unrn.repository.CarritoRepository;
+import unrn.repository.PeliculaProyeccionRepository;
 
 import java.util.List;
 
@@ -18,11 +20,19 @@ public class CarritoService {
 
     static final String ERROR_USUARIO_NO_AUTENTICADO = "Usuario no autenticado";
     static final String ERROR_REQUEST_NULO = "El request no puede ser nulo";
+    static final String ERROR_PELICULA_NO_DISPONIBLE = "La película no está disponible";
+    static final String ERROR_PELICULA_NO_ENCONTRADA = "La película no existe en la proyección";
 
     private final CarritoRepository carritoRepository;
+    private final StockService stockService;
+    private final PeliculaProyeccionRepository proyeccionRepository;
 
-    public CarritoService(CarritoRepository carritoRepository) {
+    public CarritoService(CarritoRepository carritoRepository,
+            StockService stockService,
+            PeliculaProyeccionRepository proyeccionRepository) {
         this.carritoRepository = carritoRepository;
+        this.stockService = stockService;
+        this.proyeccionRepository = proyeccionRepository;
     }
 
     public CarritoDTO verCarrito() {
@@ -34,12 +44,22 @@ public class CarritoService {
     public CarritoDTO agregarPelicula(AgregarPeliculaRequest request) {
         assertRequestNoNulo(request);
         String clienteId = obtenerClienteIdAutenticado();
+        PeliculaProyeccion proyeccion = obtenerProyeccionActiva(request.peliculaId());
 
         Carrito carrito = carritoRepository.obtenerDe(clienteId);
+
+        int stockDisponible = stockService.stockDisponible(request.peliculaId());
+        int cantidadActual = carrito.cantidadDe(request.peliculaId());
+        int cantidadSolicitada = cantidadActual + request.cantidad();
+
+        if (cantidadSolicitada > stockDisponible) {
+            throw new StockInsuficienteException(request.peliculaId(), stockDisponible, cantidadSolicitada);
+        }
+
         carrito.agregarPelicula(
                 request.peliculaId(),
-                request.titulo(),
-                request.precioUnitario(),
+            proyeccion.titulo(),
+            proyeccion.precioActual(),
                 request.cantidad());
         carritoRepository.guardar(clienteId, carrito);
 
@@ -50,6 +70,15 @@ public class CarritoService {
         String clienteId = obtenerClienteIdAutenticado();
         Carrito carrito = carritoRepository.obtenerDe(clienteId);
         carrito.eliminarPelicula(peliculaId);
+        carritoRepository.guardar(clienteId, carrito);
+
+        return mapearADTO(carrito);
+    }
+
+    public CarritoDTO decrementarPelicula(String peliculaId) {
+        String clienteId = obtenerClienteIdAutenticado();
+        Carrito carrito = carritoRepository.obtenerDe(clienteId);
+        carrito.decrementarPelicula(peliculaId);
         carritoRepository.guardar(clienteId, carrito);
 
         return mapearADTO(carrito);
@@ -83,6 +112,20 @@ public class CarritoService {
         if (request == null) {
             throw new RuntimeException(ERROR_REQUEST_NULO);
         }
+    }
+
+    private PeliculaProyeccion obtenerProyeccionActiva(String peliculaId) {
+        var proyeccion = proyeccionRepository.buscarPorMovieId(peliculaId);
+
+        if (proyeccion.isEmpty()) {
+            throw new RuntimeException(ERROR_PELICULA_NO_ENCONTRADA);
+        }
+
+        if (!proyeccion.get().activa()) {
+            throw new RuntimeException(ERROR_PELICULA_NO_DISPONIBLE);
+        }
+
+        return proyeccion.get();
     }
 
     private CarritoDTO mapearADTO(Carrito carrito) {

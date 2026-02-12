@@ -93,6 +93,11 @@ public class PeliculaEnCarrito {
         this.cantidad += delta;
     }
 
+    public void decrementarCantidad(int delta) {
+        assertDeltaValido(delta);
+        this.cantidad -= delta;
+    }
+
     private void assertDeltaValido(int delta) {
         if (delta <= 0) {
             throw new RuntimeException(ERROR_DELTA_INVALIDO);

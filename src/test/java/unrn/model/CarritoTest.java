@@ -182,6 +182,36 @@ class CarritoTest {
     }
 
     @Test
+    @DisplayName("DecrementarPelicula con cantidad mayor a uno reduce cantidad")
+    void decrementarPelicula_cantidadMayorAUno_reduceCantidad() {
+        // Setup: Preparar el escenario
+        Carrito carrito = new Carrito();
+        carrito.agregarPelicula("1", "Matrix", new BigDecimal("100.00"), 3);
+
+        // Ejercitación: Ejecutar la acción a probar
+        carrito.decrementarPelicula("1");
+
+        // Verificación: Verificar el resultado esperado
+        assertEquals(1, carrito.items().size(), "El carrito debe seguir teniendo 1 item");
+        assertEquals(2, carrito.items().get(0).cantidad(), "La cantidad debe ser 2");
+    }
+
+    @Test
+    @DisplayName("DecrementarPelicula con cantidad uno elimina el item")
+    void decrementarPelicula_cantidadUno_eliminaItem() {
+        // Setup: Preparar el escenario
+        Carrito carrito = new Carrito();
+        carrito.agregarPelicula("1", "Matrix", new BigDecimal("100.00"), 1);
+
+        // Ejercitación: Ejecutar la acción a probar
+        carrito.decrementarPelicula("1");
+
+        // Verificación: Verificar el resultado esperado
+        assertTrue(carrito.items().isEmpty(), "El carrito debe quedar vacío");
+        assertEquals(BigDecimal.ZERO, carrito.total(), "El total debe ser cero");
+    }
+
+    @Test
     @DisplayName("Constructor con lista nula lanza excepción")
     void constructor_conListaNula_lanzaExcepcion() {
         // Setup: Preparar el escenario

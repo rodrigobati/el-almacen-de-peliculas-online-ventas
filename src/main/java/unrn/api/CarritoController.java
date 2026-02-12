@@ -33,4 +33,10 @@ public class CarritoController {
         CarritoDTO carrito = carritoService.eliminarPelicula(peliculaId);
         return ResponseEntity.ok(carrito);
     }
+
+    @PatchMapping("/items/{peliculaId}/decrement")
+    public ResponseEntity<CarritoDTO> decrementarPelicula(@PathVariable String peliculaId) {
+        CarritoDTO carrito = carritoService.decrementarPelicula(peliculaId);
+        return ResponseEntity.ok(carrito);
+    }
 }

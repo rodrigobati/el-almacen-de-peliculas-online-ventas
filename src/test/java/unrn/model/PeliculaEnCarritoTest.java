@@ -169,6 +169,39 @@ class PeliculaEnCarritoTest {
     }
 
     @Test
+    @DisplayName("DecrementarCantidad con delta válido reduce cantidad y subtotal")
+    void decrementarCantidad_conDeltaValido_reduceCantidadYSubtotal() {
+        // Setup: Preparar el escenario
+        BigDecimal precio = new BigDecimal("100.00");
+        PeliculaEnCarrito pelicula = new PeliculaEnCarrito("1", "Matrix", precio, 3);
+        BigDecimal subtotalInicial = pelicula.subtotal();
+        assertEquals(new BigDecimal("300.00"), subtotalInicial, "El subtotal inicial debe ser 300.00");
+
+        // Ejercitación: Ejecutar la acción a probar
+        pelicula.decrementarCantidad(1);
+
+        // Verificación: Verificar el resultado esperado
+        assertEquals(2, pelicula.cantidad(), "La cantidad debe ser 2");
+        assertEquals(new BigDecimal("200.00"), pelicula.subtotal(), "El subtotal debe ser 200.00");
+    }
+
+    @Test
+    @DisplayName("DecrementarCantidad con delta cero o negativo lanza excepción")
+    void decrementarCantidad_conDeltaCeroONegativo_lanzaExcepcion() {
+        // Setup: Preparar el escenario
+        PeliculaEnCarrito pelicula = new PeliculaEnCarrito("1", "Matrix", new BigDecimal("100.00"), 1);
+        int delta = 0;
+
+        // Ejercitación: Ejecutar la acción a probar
+        var ex = assertThrows(RuntimeException.class, () -> {
+            pelicula.decrementarCantidad(delta);
+        });
+
+        // Verificación: Verificar el resultado esperado
+        assertEquals(PeliculaEnCarrito.ERROR_DELTA_INVALIDO, ex.getMessage());
+    }
+
+    @Test
     @DisplayName("Absorber con misma película suma cantidad")
     void absorber_mismaPelicula_sumaCantidad() {
         // Setup: Preparar el escenario
