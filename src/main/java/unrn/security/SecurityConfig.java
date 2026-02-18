@@ -1,6 +1,7 @@
 package unrn.security;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -23,12 +24,27 @@ public class SecurityConfig {
         private String jwkSetUri;
 
         @Bean
-        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        @Profile("dev|test")
+        public SecurityFilterChain securityFilterChainDevTest(HttpSecurity http) throws Exception {
                 http
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers("/actuator/health").permitAll()
                                                 .requestMatchers("/h2-console/**").permitAll()
-                                                .requestMatchers("/carrito/**").authenticated()
+                                                .requestMatchers("/api/**").permitAll()
+                                                .anyRequest().permitAll())
+                                .csrf(csrf -> csrf.disable())
+                                .headers(headers -> headers.frameOptions(frame -> frame.disable()));
+
+                return http.build();
+        }
+
+        @Bean
+        @Profile("!dev & !test")
+        public SecurityFilterChain securityFilterChainProdLike(HttpSecurity http) throws Exception {
+                http
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers("/actuator/health").permitAll()
+                                                .requestMatchers("/api/**").authenticated()
                                                 .anyRequest().authenticated())
                                 .oauth2ResourceServer(oauth2 -> oauth2
                                                 .jwt(jwt -> jwt.decoder(jwtDecoder())))

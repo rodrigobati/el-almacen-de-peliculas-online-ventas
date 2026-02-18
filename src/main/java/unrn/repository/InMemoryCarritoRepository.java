@@ -1,12 +1,10 @@
 package unrn.repository;
 
-import org.springframework.stereotype.Repository;
 import unrn.model.Carrito;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Repository
 public class InMemoryCarritoRepository implements CarritoRepository {
 
     private final Map<String, Carrito> carritos = new ConcurrentHashMap<>();

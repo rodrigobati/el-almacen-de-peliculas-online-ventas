@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -241,5 +242,100 @@ class CarritoTest {
 
         // Verificación: Verificar el resultado esperado
         assertEquals(Carrito.ERROR_PELICULAS_DUPLICADAS, ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("ConfirmarCompra con cliente nulo lanza excepción")
+    void confirmarCompra_clienteNulo_lanzaExcepcion() {
+        // Setup: Preparar el escenario
+        Carrito carrito = new Carrito();
+        carrito.agregarPelicula("1", "Matrix", new BigDecimal("100.00"), 1);
+
+        // Ejercitación: Ejecutar la acción a probar
+        var ex = assertThrows(RuntimeException.class, () -> {
+            carrito.confirmarCompra(null, Instant.parse("2026-02-17T10:15:30Z"));
+        });
+
+        // Verificación: Verificar el resultado esperado
+        assertEquals(Carrito.ERROR_CLIENTE_NULO, ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("ConfirmarCompra con carrito vacío lanza excepción")
+    void confirmarCompra_carritoVacio_lanzaExcepcion() {
+        // Setup: Preparar el escenario
+        Carrito carrito = new Carrito();
+        Cliente cliente = new Cliente("cliente-1");
+
+        // Ejercitación: Ejecutar la acción a probar
+        var ex = assertThrows(RuntimeException.class, () -> {
+            carrito.confirmarCompra(cliente, Instant.parse("2026-02-17T10:15:30Z"));
+        });
+
+        // Verificación: Verificar el resultado esperado
+        assertEquals(Carrito.ERROR_CARRITO_VACIO, ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("ConfirmarCompra con descuento vigente aplica descuento y vacía carrito")
+    void confirmarCompra_descuentoVigente_aplicaDescuentoYVaciaCarrito() {
+        // Setup: Preparar el escenario
+        Carrito carrito = new Carrito();
+        carrito.agregarPelicula("1", "Matrix", new BigDecimal("100.00"), 2);
+        Cliente cliente = new Cliente("cliente-1");
+        Instant fechaCompra = Instant.parse("2026-02-17T10:15:30Z");
+        Descuento descuento = new Descuento(
+                new BigDecimal("10"),
+                Instant.parse("2026-02-01T00:00:00Z"),
+                Instant.parse("2026-02-28T23:59:59Z"));
+
+        // Ejercitación: Ejecutar la acción a probar
+        Compra compra = carrito.confirmarCompra(cliente, fechaCompra, descuento);
+
+        // Verificación: Verificar el resultado esperado
+        assertTrue(compra.cliente().esElMismoQue(cliente), "La compra debe pertenecer al cliente autenticado");
+        assertEquals(fechaCompra, compra.fechaHoraCompra(), "La compra debe guardar el instante recibido");
+        assertEquals(new BigDecimal("200.00"), compra.subtotal(), "El subtotal debe ser 200.00");
+        assertEquals(new BigDecimal("20.00"), compra.descuentoAplicado(), "El descuento aplicado debe ser 20.00");
+        assertEquals(new BigDecimal("180.00"), compra.total(), "El total final debe ser 180.00");
+        assertTrue(carrito.items().isEmpty(), "El carrito debe quedar vacío luego de confirmar compra");
+    }
+
+    @Test
+    @DisplayName("ConfirmarCompra con descuento fuera de vigencia no aplica descuento")
+    void confirmarCompra_descuentoFueraDeVigencia_noAplicaDescuento() {
+        // Setup: Preparar el escenario
+        Carrito carrito = new Carrito();
+        carrito.agregarPelicula("1", "Matrix", new BigDecimal("100.00"), 2);
+        Cliente cliente = new Cliente("cliente-1");
+        Instant fechaCompra = Instant.parse("2026-02-17T10:15:30Z");
+        Descuento descuento = new Descuento(
+                new BigDecimal("10"),
+                Instant.parse("2026-03-01T00:00:00Z"),
+                Instant.parse("2026-03-31T23:59:59Z"));
+
+        // Ejercitación: Ejecutar la acción a probar
+        Compra compra = carrito.confirmarCompra(cliente, fechaCompra, descuento);
+
+        // Verificación: Verificar el resultado esperado
+        assertEquals(new BigDecimal("0"), compra.descuentoAplicado(), "No debe aplicarse descuento fuera de vigencia");
+        assertEquals(new BigDecimal("200.00"), compra.total(), "El total debe ser igual al subtotal sin descuento");
+    }
+
+    @Test
+    @DisplayName("ConfirmarCompra guarda snapshot de precio en detalle")
+    void confirmarCompra_guardaSnapshotPrecioEnDetalle() {
+        // Setup: Preparar el escenario
+        Carrito carrito = new Carrito();
+        carrito.agregarPelicula("1", "Matrix", new BigDecimal("120.00"), 1);
+        Cliente cliente = new Cliente("cliente-1");
+
+        // Ejercitación: Ejecutar la acción a probar
+        Compra compra = carrito.confirmarCompra(cliente, Instant.parse("2026-02-17T10:15:30Z"));
+
+        // Verificación: Verificar el resultado esperado
+        DetalleCompra detalle = compra.detalles().get(0);
+        assertEquals(new BigDecimal("120.00"), detalle.precioAlComprar(),
+                "El detalle debe conservar el precio al confirmar compra");
     }
 }

@@ -1,6 +1,7 @@
 package unrn.model;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -14,6 +15,10 @@ public class Carrito {
     static final String ERROR_CANTIDAD_INVALIDA = "La cantidad debe ser mayor a cero";
     static final String ERROR_ITEM_NO_ENCONTRADO = "No se encontró un item con el id de película especificado";
     static final String ERROR_PELICULAS_DUPLICADAS = "No se permiten películas duplicadas en el carrito";
+    static final String ERROR_CLIENTE_NULO = "El cliente no puede ser nulo";
+    static final String ERROR_FECHA_HORA_NULA = "La fecha y hora no puede ser nula";
+    static final String ERROR_DESCUENTO_NULO = "El descuento no puede ser nulo";
+    static final String ERROR_CARRITO_VACIO = "No se puede confirmar una compra con carrito vacío";
 
     private final List<PeliculaEnCarrito> items;
 
@@ -149,5 +154,60 @@ public class Carrito {
 
     public List<PeliculaEnCarrito> items() {
         return Collections.unmodifiableList(items);
+    }
+
+    public Compra confirmarCompra(Cliente cliente, Instant fechaHora) {
+        return confirmarCompra(cliente, fechaHora, Descuento.sinDescuento());
+    }
+
+    public Compra confirmarCompra(Cliente cliente, Instant fechaHora, Descuento descuento) {
+        assertClienteNoNulo(cliente);
+        assertFechaHoraNoNula(fechaHora);
+        assertDescuentoNoNulo(descuento);
+        assertCarritoNoVacio();
+
+        BigDecimal subtotal = total();
+        BigDecimal descuentoAplicado = descuento.montoAplicadoSobre(subtotal, fechaHora);
+        List<DetalleCompra> detalles = construirDetallesCompra();
+
+        Compra compra = new Compra(cliente, fechaHora, detalles, subtotal, descuentoAplicado);
+        vaciar();
+        return compra;
+    }
+
+    private void assertClienteNoNulo(Cliente cliente) {
+        if (cliente == null) {
+            throw new RuntimeException(ERROR_CLIENTE_NULO);
+        }
+    }
+
+    private void assertFechaHoraNoNula(Instant fechaHora) {
+        if (fechaHora == null) {
+            throw new RuntimeException(ERROR_FECHA_HORA_NULA);
+        }
+    }
+
+    private void assertDescuentoNoNulo(Descuento descuento) {
+        if (descuento == null) {
+            throw new RuntimeException(ERROR_DESCUENTO_NULO);
+        }
+    }
+
+    private void assertCarritoNoVacio() {
+        if (items.isEmpty()) {
+            throw new RuntimeException(ERROR_CARRITO_VACIO);
+        }
+    }
+
+    private List<DetalleCompra> construirDetallesCompra() {
+        List<DetalleCompra> detalles = new ArrayList<>();
+        for (PeliculaEnCarrito item : items) {
+            detalles.add(new DetalleCompra(item.peliculaId(), item.titulo(), item.precioUnitario(), item.cantidad()));
+        }
+        return detalles;
+    }
+
+    private void vaciar() {
+        items.clear();
     }
 }

@@ -89,4 +89,8 @@ public class DetalleCompra {
     public int cantidad() {
         return cantidad;
     }
+
+    public BigDecimal subtotal() {
+        return precioAlComprar.multiply(BigDecimal.valueOf(cantidad));
+    }
 }
