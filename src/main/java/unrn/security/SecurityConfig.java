@@ -44,6 +44,7 @@ public class SecurityConfig {
                 http
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers("/actuator/health").permitAll()
+                                                .requestMatchers("/internal/projection/rebuild").permitAll()
                                                 .requestMatchers("/api/**").authenticated()
                                                 .anyRequest().authenticated())
                                 .oauth2ResourceServer(oauth2 -> oauth2

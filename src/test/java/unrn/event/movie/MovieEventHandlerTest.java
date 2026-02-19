@@ -6,6 +6,7 @@ import unrn.model.PeliculaProyeccion;
 import unrn.repository.PeliculaProyeccionRepository;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -101,6 +102,11 @@ class MovieEventHandlerTest {
         @Override
         public void guardar(PeliculaProyeccion proyeccion) {
             data.put(proyeccion.movieId(), proyeccion);
+        }
+
+        @Override
+        public List<PeliculaProyeccion> buscarTodas() {
+            return List.copyOf(data.values());
         }
     }
 }

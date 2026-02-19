@@ -153,6 +153,30 @@ class ConfirmarCompraIntegrationTest {
                                 .andExpect(jsonPath("$.totalFinal").value(100.00));
         }
 
+        @Test
+        @DisplayName("DetalleCompra compraConfirmadaSinRechazo noExponeDatosDeRechazo")
+        void detalleCompra_compraConfirmadaSinRechazo_noExponeDatosDeRechazo() throws Exception {
+                // Setup: Preparar el escenario
+                guardarCarritoYConfirmar("cliente-cthulhu", "32", "Call of Cthulhu", "1.00", 1);
+
+                ResultActions historial = mockMvc.perform(get("/api/compras")
+                                .header("X-Cliente-Id", "cliente-cthulhu"));
+
+                String body = historial.andReturn().getResponse().getContentAsString();
+                JsonNode jsonNode = objectMapper.readTree(body);
+                long compraId = jsonNode.get(0).get("compraId").asLong();
+
+                // Ejercitación: Ejecutar la acción a probar
+                mockMvc.perform(get("/api/compras/{id}", compraId)
+                                .header("X-Cliente-Id", "cliente-cthulhu"))
+                                // Verificación: Verificar el resultado esperado
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.compraId").value(compraId))
+                                .andExpect(jsonPath("$.estado").value("CONFIRMADA"))
+                                .andExpect(jsonPath("$.motivoRechazo").value(org.hamcrest.Matchers.nullValue()))
+                                .andExpect(jsonPath("$.detallesRechazo").value(org.hamcrest.Matchers.nullValue()));
+        }
+
         private void guardarCarritoYConfirmar(String clienteId, String peliculaId, String titulo, String precio,
                         int cantidad)
                         throws Exception {

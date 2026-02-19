@@ -2,6 +2,7 @@ package unrn.repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -44,6 +45,12 @@ public class JdbcPeliculaProyeccionRepository implements PeliculaProyeccionRepos
                     proyeccion.activa(),
                     proyeccion.version());
         }
+    }
+
+    @Override
+    public List<PeliculaProyeccion> buscarTodas() {
+        var sql = "SELECT movie_id, titulo, precio_actual, activa, version FROM pelicula_proyeccion";
+        return jdbcTemplate.query(sql, new PeliculaProyeccionRowMapper());
     }
 
     private static class PeliculaProyeccionRowMapper implements RowMapper<PeliculaProyeccion> {

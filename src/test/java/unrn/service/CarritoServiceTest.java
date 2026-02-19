@@ -21,6 +21,7 @@ import unrn.repository.StockRepository;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -110,6 +111,26 @@ class CarritoServiceTest {
     }
 
     @Test
+    @DisplayName("AddToCart peliculaExistenteEnProyeccion ok")
+    void addToCart_peliculaExistenteEnProyeccion_ok() {
+        // Setup: Preparar el escenario
+        registrarProyeccion("pelicula-77", "Interstellar", new BigDecimal("1500.00"));
+        AgregarPeliculaRequest request = new AgregarPeliculaRequest(
+                "pelicula-77",
+                "Interstellar",
+                new BigDecimal("1500.00"),
+                1);
+
+        // Ejercitación: Ejecutar la acción a probar
+        CarritoDTO resultado = service.agregarPelicula(request);
+
+        // Verificación: Verificar el resultado esperado
+        assertEquals(1, resultado.items().size(), "Debe existir un único item en el carrito");
+        assertEquals("pelicula-77", resultado.items().get(0).peliculaId(), "El id proyectado debe coincidir");
+        assertEquals(new BigDecimal("1500.00"), resultado.total(), "El total debe calcularse con el precio proyectado");
+    }
+
+    @Test
     @DisplayName("AgregarPelicula misma película incrementa cantidad y total correcto")
     void agregarPelicula_mismaPelicula_incrementaCantidadYTotalCorrecto() {
         // Setup: Agregar película primera vez
@@ -174,7 +195,7 @@ class CarritoServiceTest {
             service.eliminarPelicula("pelicula-inexistente");
         });
         assertEquals(ERROR_ITEM_NO_ENCONTRADO, ex.getMessage(),
-            "El mensaje debería indicar que el item no fue encontrado");
+                "El mensaje debería indicar que el item no fue encontrado");
     }
 
     @Test
@@ -193,7 +214,7 @@ class CarritoServiceTest {
             service.agregarPelicula(request);
         });
         assertEquals(ERROR_CANTIDAD_INVALIDA, ex.getMessage(),
-            "El mensaje debería indicar problema con la cantidad");
+                "El mensaje debería indicar problema con la cantidad");
     }
 
     @Test
@@ -302,6 +323,11 @@ class CarritoServiceTest {
         @Override
         public void guardar(PeliculaProyeccion proyeccion) {
             data.put(proyeccion.movieId(), proyeccion);
+        }
+
+        @Override
+        public List<PeliculaProyeccion> buscarTodas() {
+            return List.copyOf(data.values());
         }
     }
 }
