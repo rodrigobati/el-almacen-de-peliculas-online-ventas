@@ -22,7 +22,18 @@ public class MovieEventListener {
     @RabbitListener(bindings = @QueueBinding(value = @Queue(value = "${rabbitmq.event.movie.queue.name}", durable = "true"), exchange = @Exchange(value = "${rabbitmq.catalogo.events.exchange}", type = "topic"), key = {
             "MovieCreated.v1", "MovieUpdated.v1", "MovieRetired.v1" }))
     public void onMovieEvent(MovieEventEnvelope envelope) {
-        log.info("Evento de catalogo recibido: {}", envelope.eventType());
-        handler.handle(envelope);
+        String eventType = envelope != null ? envelope.eventType() : "unknown";
+        String eventId = envelope != null ? envelope.eventId() : "unknown";
+
+        log.info("Evento de catalogo recibido: {} ({})", eventType, eventId);
+        try {
+            handler.handle(envelope);
+        } catch (MovieEventNoRetryException ex) {
+            log.error(
+                    "evento_movie_descartado_sin_reintento eventId={} eventType={} reason={}",
+                    eventId,
+                    eventType,
+                    ex.getMessage());
+        }
     }
 }

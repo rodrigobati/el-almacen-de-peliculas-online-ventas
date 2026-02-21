@@ -15,12 +15,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class MovieEventHandlerTest {
 
     @Test
-    @DisplayName("aplicarMovieCreated creaProyeccion")
-    void aplicarMovieCreated_creaProyeccion() {
+    @DisplayName("version cero sin proyeccion existente se normaliza a uno")
+    void versionCero_sinProyeccionExistente_seNormalizaAUno() {
         // Setup: Preparar el escenario
         var repo = new InMemoryPeliculaProyeccionRepository();
         var handler = new MovieEventHandler(repo);
-        var payload = new MovieEventPayload(1L, "Matrix", 1000.0, true, 1L);
+        var payload = new MovieEventPayload(1L, "Matrix", 1000.0, true, 0L);
         var event = new MovieEventEnvelope("evt-1", "MovieCreated.v1", java.time.Instant.now(), payload);
 
         // Ejercitación: Ejecutar la acción a probar
@@ -30,16 +30,17 @@ class MovieEventHandlerTest {
         var proyeccion = repo.buscarPorMovieId("1");
         assertTrue(proyeccion.isPresent(), "La proyección debería existir");
         assertEquals("Matrix", proyeccion.get().titulo(), "El título debe coincidir");
+        assertEquals(1L, proyeccion.get().version(), "La versión 0 debe normalizarse a 1");
     }
 
     @Test
-    @DisplayName("aplicarMovieUpdated actualizaProyeccion")
-    void aplicarMovieUpdated_actualizaProyeccion() {
+    @DisplayName("version igual a actual se ignora por idempotencia")
+    void versionIgualAActual_seIgnoraPorIdempotencia() {
         // Setup: Preparar el escenario
         var repo = new InMemoryPeliculaProyeccionRepository();
-        repo.guardar(new PeliculaProyeccion("1", "Vieja", new java.math.BigDecimal("900.0"), true, 1L));
+        repo.guardar(new PeliculaProyeccion("1", "Actual", new java.math.BigDecimal("1000.0"), true, 2L));
         var handler = new MovieEventHandler(repo);
-        var payload = new MovieEventPayload(1L, "Nueva", 1000.0, true, 2L);
+        var payload = new MovieEventPayload(1L, "NoDebeAplicar", 900.0, true, 2L);
         var event = new MovieEventEnvelope("evt-2", "MovieUpdated.v1", java.time.Instant.now(), payload);
 
         // Ejercitación: Ejecutar la acción a probar
@@ -47,14 +48,14 @@ class MovieEventHandlerTest {
 
         // Verificación: Verificar el resultado esperado
         var proyeccion = repo.buscarPorMovieId("1").get();
-        assertEquals("Nueva", proyeccion.titulo(), "El título debería actualizarse");
-        assertEquals(new java.math.BigDecimal("1000.0"), proyeccion.precioActual(), "El precio debería actualizarse");
+        assertEquals("Actual", proyeccion.titulo(), "No debería sobrescribir una versión ya aplicada");
+        assertEquals(new java.math.BigDecimal("1000.0"), proyeccion.precioActual(), "El precio no debería cambiar");
         assertEquals(2L, proyeccion.version(), "La versión debería actualizarse");
     }
 
     @Test
-    @DisplayName("aplicarMovieUpdatedVersionVieja seIgnora")
-    void aplicarMovieUpdatedVersionVieja_seIgnora() {
+    @DisplayName("version menor a actual se ignora por idempotencia")
+    void versionMenorAActual_seIgnoraPorIdempotencia() {
         // Setup: Preparar el escenario
         var repo = new InMemoryPeliculaProyeccionRepository();
         repo.guardar(new PeliculaProyeccion("1", "Actual", new java.math.BigDecimal("1000.0"), true, 2L));
@@ -73,22 +74,41 @@ class MovieEventHandlerTest {
     }
 
     @Test
-    @DisplayName("aplicarMovieRetired desactiva")
-    void aplicarMovieRetired_desactiva() {
+    @DisplayName("version siguiente se aplica correctamente")
+    void versionSiguiente_seAplicaCorrectamente() {
         // Setup: Preparar el escenario
         var repo = new InMemoryPeliculaProyeccionRepository();
-        repo.guardar(new PeliculaProyeccion("1", "Activa", new java.math.BigDecimal("1000.0"), true, 1L));
+        repo.guardar(new PeliculaProyeccion("1", "Activa", new java.math.BigDecimal("1000.0"), true, 2L));
         var handler = new MovieEventHandler(repo);
-        var payload = new MovieEventPayload(1L, "Activa", 1000.0, false, 2L);
-        var event = new MovieEventEnvelope("evt-4", "MovieRetired.v1", java.time.Instant.now(), payload);
+        var payload = new MovieEventPayload(1L, "Actualizada", 1200.0, false, 3L);
+        var event = new MovieEventEnvelope("evt-4", "MovieUpdated.v1", java.time.Instant.now(), payload);
 
         // Ejercitación: Ejecutar la acción a probar
         handler.handle(event);
 
         // Verificación: Verificar el resultado esperado
         var proyeccion = repo.buscarPorMovieId("1").get();
+        assertEquals("Actualizada", proyeccion.titulo(), "La actualización debe aplicarse");
+        assertEquals(new java.math.BigDecimal("1200.0"), proyeccion.precioActual(), "El precio debe actualizarse");
         assertFalse(proyeccion.activa(), "La proyección debería quedar inactiva");
-        assertEquals(2L, proyeccion.version(), "La versión debería actualizarse");
+        assertEquals(3L, proyeccion.version(), "La versión debería actualizarse");
+    }
+
+    @Test
+    @DisplayName("version con gap lanza excepcion controlada")
+    void versionConGap_lanzaExcepcionControlada() {
+        // Setup: Preparar el escenario
+        var repo = new InMemoryPeliculaProyeccionRepository();
+        repo.guardar(new PeliculaProyeccion("1", "Activa", new java.math.BigDecimal("1000.0"), true, 2L));
+        var handler = new MovieEventHandler(repo);
+        var payload = new MovieEventPayload(1L, "NoAplicar", 1500.0, true, 5L);
+        var event = new MovieEventEnvelope("evt-5", "MovieUpdated.v1", java.time.Instant.now(), payload);
+
+        // Ejercitación: Ejecutar la acción a probar
+        var ex = assertThrows(MovieEventVersionGapException.class, () -> handler.handle(event));
+
+        // Verificación: Verificar el resultado esperado
+        assertTrue(ex.getMessage().contains("movieId=1"), "El mensaje debe incluir el movieId para diagnóstico");
     }
 
     private static class InMemoryPeliculaProyeccionRepository implements PeliculaProyeccionRepository {
