@@ -6,11 +6,10 @@ WORKDIR /app
 
 # Descargar dependencias (capa cacheada si no cambia pom.xml)
 COPY pom.xml .
-RUN mvn -q -DskipTests dependency:go-offline
 
 # Copiar código fuente y compilar
 COPY src ./src
-RUN mvn -q -DskipTests package
+RUN mvn -q -Dmaven.test.skip=true package
 
 # ========================================
 # Etapa 2: RUNTIME

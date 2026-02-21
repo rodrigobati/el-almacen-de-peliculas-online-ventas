@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.util.List;
@@ -22,6 +23,9 @@ public class SecurityConfig {
 
         @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
         private String jwkSetUri;
+
+        @Value("${security.keycloak.client-id:}")
+        private String keycloakClientId;
 
         @Bean
         @Profile("dev|test")
@@ -48,7 +52,9 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/**").authenticated()
                                                 .anyRequest().authenticated())
                                 .oauth2ResourceServer(oauth2 -> oauth2
-                                                .jwt(jwt -> jwt.decoder(jwtDecoder())))
+                                                .jwt(jwt -> jwt.decoder(jwtDecoder())
+                                                                .jwtAuthenticationConverter(
+                                                                                jwtAuthenticationConverter())))
                                 .csrf(csrf -> csrf.disable())
                                 .headers(headers -> headers.frameOptions(frame -> frame.disable()));
 
@@ -82,5 +88,12 @@ public class SecurityConfig {
 
                 jwtDecoder.setJwtValidator(validator);
                 return jwtDecoder;
+        }
+
+        @Bean
+        public JwtAuthenticationConverter jwtAuthenticationConverter() {
+                JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+                converter.setJwtGrantedAuthoritiesConverter(new JwtRoleConverter(keycloakClientId));
+                return converter;
         }
 }
