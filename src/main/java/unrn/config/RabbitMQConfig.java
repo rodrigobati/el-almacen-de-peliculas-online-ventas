@@ -23,8 +23,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    @Value("${rabbitmq.ventas.events.exchange}")
-    private String ventasEventsExchangeName;
+    @Value("${rabbitmq.compras.events.exchange}")
+    private String comprasEventsExchangeName;
 
     @Value("${rabbitmq.catalogo.events.exchange}")
     private String catalogoEventsExchangeName;
@@ -57,8 +57,8 @@ public class RabbitMQConfig {
     private String ventasRetryExchangeName;
 
     @Bean
-    public TopicExchange ventasEventsExchange() {
-        return new TopicExchange(ventasEventsExchangeName, true, false);
+    public TopicExchange comprasEventsExchange() {
+        return new TopicExchange(comprasEventsExchangeName, true, false);
     }
 
     @Bean

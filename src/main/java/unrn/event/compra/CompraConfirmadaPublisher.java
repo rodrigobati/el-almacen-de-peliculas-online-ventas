@@ -22,10 +22,10 @@ public class CompraConfirmadaPublisher {
     private static final Logger log = LoggerFactory.getLogger(CompraConfirmadaPublisher.class);
 
     private final RabbitTemplate rabbitTemplate;
-    private final TopicExchange ventasEventsExchange;
+    private final TopicExchange comprasEventsExchange;
     private final MeterRegistry meterRegistry;
 
-    @Value("${rabbitmq.ventas.compra.confirmada.routing-key}")
+    @Value("${rabbitmq.compras.compra.confirmada.routing-key}")
     private String routingKey;
 
     @Value("${rabbitmq.publisher.confirm-timeout-ms:5000}")
@@ -35,28 +35,28 @@ public class CompraConfirmadaPublisher {
     private boolean strictConfirms;
 
     public CompraConfirmadaPublisher(RabbitTemplate rabbitTemplate,
-            @Qualifier("ventasEventsExchange") TopicExchange ventasEventsExchange,
+            @Qualifier("comprasEventsExchange") TopicExchange comprasEventsExchange,
             MeterRegistry meterRegistry) {
         this.rabbitTemplate = rabbitTemplate;
-        this.ventasEventsExchange = ventasEventsExchange;
+        this.comprasEventsExchange = comprasEventsExchange;
         this.meterRegistry = meterRegistry;
     }
 
     public void publicarAhora(CompraConfirmadaEvent event) {
-        MDC.put("eventId", event.eventId());
-        MDC.put("compraId", String.valueOf(event.compraId()));
-        CorrelationData correlationData = new CorrelationData(event.eventId());
+        MDC.put("eventId", event.eventId().toString());
+        MDC.put("compraId", String.valueOf(event.data().compraId()));
+        CorrelationData correlationData = new CorrelationData(event.eventId().toString());
         try {
-            log.info("Publicando CompraConfirmada eventId={} compraId={}", event.eventId(), event.compraId());
+            log.info("Publicando CompraConfirmada eventId={} compraId={}", event.eventId(), event.data().compraId());
             rabbitTemplate.convertAndSend(
-                    ventasEventsExchange.getName(),
+                    comprasEventsExchange.getName(),
                     routingKey,
                     event,
                     message -> {
-                        message.getMessageProperties().setHeader("x-event-id", event.eventId());
-                        message.getMessageProperties().setHeader("x-correlation-id", event.eventId());
+                        message.getMessageProperties().setHeader("x-event-id", event.eventId().toString());
+                        message.getMessageProperties().setHeader("x-correlation-id", event.eventId().toString());
                         message.getMessageProperties().setHeader("x-source", "ventas");
-                        message.getMessageProperties().setHeader(AmqpHeaders.TYPE, "CompraConfirmadaEvent");
+                        message.getMessageProperties().setHeader(AmqpHeaders.TYPE, CompraConfirmadaEvent.EVENT_TYPE);
                         return message;
                     },
                     correlationData);
@@ -64,7 +64,7 @@ public class CompraConfirmadaPublisher {
             meterRegistry.counter("ventas.publisher.compra_confirmada.success.total").increment();
         } catch (Exception ex) {
             log.error("No se pudo publicar CompraConfirmada eventId={} compraId={} mensaje={}",
-                    event.eventId(), event.compraId(), ex.getMessage());
+                    event.eventId(), event.data().compraId(), ex.getMessage());
             meterRegistry.counter("ventas.publisher.compra_confirmada.failed.total").increment();
             if (strictConfirms) {
                 throw new RuntimeException(ERROR_PUBLICACION_COMPRA_CONFIRMADA, ex);

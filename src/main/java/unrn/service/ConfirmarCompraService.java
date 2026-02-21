@@ -23,9 +23,11 @@ import unrn.persistence.CompraJpaRepository;
 import unrn.repository.CarritoRepository;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class ConfirmarCompraService {
@@ -169,14 +171,27 @@ public class ConfirmarCompraService {
     private CompraConfirmadaEvent eventoDesde(CompraEntity compraGuardada) {
         List<CompraConfirmadaEvent.ItemCompraConfirmada> items = compraGuardada.getItems().stream()
                 .map(item -> new CompraConfirmadaEvent.ItemCompraConfirmada(
-                        Long.parseLong(item.getPeliculaId()),
-                        item.getCantidad()))
+                        item.getTituloAlComprar(),
+                        item.getCantidad(),
+                        item.getPrecioAlComprar()))
                 .toList();
 
-        return new CompraConfirmadaEvent(
-                compraGuardada.getId(),
+        var total = new CompraConfirmadaEvent.TotalCompraConfirmada(
+                compraGuardada.getSubtotal(),
+                compraGuardada.getDescuentoAplicado(),
+                null);
+
+        var data = new CompraConfirmadaEvent.Data(
+                compraIdEstable(compraGuardada.getId()),
                 compraGuardada.getClienteId(),
                 compraGuardada.getFechaHora(),
-                items);
+                items,
+                total);
+
+        return new CompraConfirmadaEvent(data);
+    }
+
+    private UUID compraIdEstable(Long compraIdNumerico) {
+        return UUID.nameUUIDFromBytes(("compra-" + compraIdNumerico).getBytes(StandardCharsets.UTF_8));
     }
 }
