@@ -3,12 +3,7 @@ package unrn.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.Declarables;
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -169,4 +164,22 @@ public class RabbitMQConfig {
         factory.setAcknowledgeMode(org.springframework.amqp.core.AcknowledgeMode.MANUAL);
         return factory;
     }
+    @Bean
+    public TopicExchange descuentosExchange(@Value("${rabbitmq.descuentos.exchange}") String name) {
+        return new TopicExchange(name, true, false);
+    }
+
+    @Bean
+    public Queue validarCuponQueue(@Value("${rabbitmq.descuentos.cupon.validar.queue}") String name) {
+        return QueueBuilder.durable(name).build();
+    }
+
+    @Bean
+    public Binding validarCuponBinding(
+            Queue validarCuponQueue,
+            TopicExchange descuentosExchange,
+            @Value("${rabbitmq.descuentos.cupon.validar.routing-key}") String routingKey) {
+        return BindingBuilder.bind(validarCuponQueue).to(descuentosExchange).with(routingKey);
+    }
+
 }

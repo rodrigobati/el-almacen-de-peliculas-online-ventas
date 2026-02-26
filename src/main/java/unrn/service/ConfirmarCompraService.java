@@ -34,20 +34,27 @@ public class ConfirmarCompraService {
 
     static final String ERROR_FECHAS_DESCUENTO_INCOMPLETAS = "Para aplicar descuento debe informar vigenteDesde y vigenteHasta";
     static final String ERROR_COMPRA_NO_ENCONTRADA = "No se encontró la compra para el cliente autenticado";
+    static final String ERROR_CUPON_INVALIDO = "Cupón inválido";
+    static final String ERROR_CUPON_RESPUESTA_INCOMPLETA = "Respuesta de descuentos incompleta";
 
     private final CarritoRepository carritoRepository;
     private final CompraJpaRepository compraJpaRepository;
     private final ClienteActualProvider clienteActualProvider;
     private final OutboxEventService outboxEventService;
 
+    // NUEVO: cliente RPC a descuentos
+    private final DescuentosRpcClient descuentosRpcClient;
+
     public ConfirmarCompraService(CarritoRepository carritoRepository,
-            CompraJpaRepository compraJpaRepository,
-            ClienteActualProvider clienteActualProvider,
-            OutboxEventService outboxEventService) {
+                                  CompraJpaRepository compraJpaRepository,
+                                  ClienteActualProvider clienteActualProvider,
+                                  OutboxEventService outboxEventService,
+                                  DescuentosRpcClient descuentosRpcClient) { // NUEVO parámetro
         this.carritoRepository = carritoRepository;
         this.compraJpaRepository = compraJpaRepository;
         this.clienteActualProvider = clienteActualProvider;
         this.outboxEventService = outboxEventService;
+        this.descuentosRpcClient = descuentosRpcClient; // NUEVO
     }
 
     @Transactional(readOnly = true)
@@ -136,8 +143,28 @@ public class ConfirmarCompraService {
         return new CarritoCompraResponse(items, subtotal, descuentoAplicado, totalFinal);
     }
 
+    // CAMBIO PRINCIPAL: si vino nombreCupon, pedir a descuentos el porcentaje+vigencia
     private Descuento construirDescuento(ConfirmarCompraRequest request) {
-        if (request == null || request.porcentajeDescuento() == null) {
+        if (request == null) {
+            return Descuento.sinDescuento();
+        }
+
+        if (request.nombreCupon() != null && !request.nombreCupon().isBlank()) {
+            var resp = descuentosRpcClient.validarCupon(request.nombreCupon());
+
+            if (!resp.valido()) {
+                throw new RuntimeException(ERROR_CUPON_INVALIDO + ": " + resp.motivo());
+            }
+
+            if (resp.porcentajeDescuento() == null || resp.vigenteDesde() == null || resp.vigenteHasta() == null) {
+                throw new RuntimeException(ERROR_CUPON_RESPUESTA_INCOMPLETA);
+            }
+
+            return new Descuento(resp.porcentajeDescuento(), resp.vigenteDesde(), resp.vigenteHasta());
+        }
+
+        // fallback: tu comportamiento actual
+        if (request.porcentajeDescuento() == null) {
             return Descuento.sinDescuento();
         }
 
