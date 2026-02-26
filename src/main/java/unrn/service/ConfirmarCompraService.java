@@ -25,6 +25,7 @@ import unrn.repository.CarritoRepository;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -153,25 +154,38 @@ public class ConfirmarCompraService {
             var resp = descuentosRpcClient.validarCupon(request.nombreCupon());
 
             if (!resp.valido()) {
-                throw new RuntimeException(ERROR_CUPON_INVALIDO + ": " + resp.motivo());
+                throw new RuntimeException("CUPON_INVALIDO: " + resp.motivo());
             }
 
             if (resp.porcentajeDescuento() == null || resp.vigenteDesde() == null || resp.vigenteHasta() == null) {
-                throw new RuntimeException(ERROR_CUPON_RESPUESTA_INCOMPLETA);
+                throw new RuntimeException("CUPON_RESPUESTA_INCOMPLETA");
             }
 
-            return new Descuento(resp.porcentajeDescuento(), resp.vigenteDesde(), resp.vigenteHasta());
+            ZoneId zone = ZoneId.systemDefault();
+
+            Instant desde = resp.vigenteDesde()
+                    .atStartOfDay(zone)
+                    .toInstant();
+
+            Instant hasta = resp.vigenteHasta()
+                    .plusDays(1)
+                    .atStartOfDay(zone)
+                    .toInstant()
+                    .minusNanos(1);
+
+            return new Descuento(
+                    BigDecimal.valueOf(resp.porcentajeDescuento()),
+                    desde,
+                    hasta);
         }
 
         // fallback: tu comportamiento actual
         if (request.porcentajeDescuento() == null) {
             return Descuento.sinDescuento();
         }
-
         if (request.vigenteDesde() == null || request.vigenteHasta() == null) {
             throw new RuntimeException(ERROR_FECHAS_DESCUENTO_INCOMPLETAS);
         }
-
         return new Descuento(request.porcentajeDescuento(), request.vigenteDesde(), request.vigenteHasta());
     }
 

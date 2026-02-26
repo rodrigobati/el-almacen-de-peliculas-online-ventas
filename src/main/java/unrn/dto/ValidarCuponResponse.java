@@ -1,13 +1,12 @@
 package unrn.dto;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
-import java.time.Instant;
+import java.time.LocalDate;
 
 public record ValidarCuponResponse(
         boolean valido,
-        BigDecimal porcentajeDescuento,
-        Instant vigenteDesde,
-        Instant vigenteHasta,
+        Float porcentajeDescuento,
+        LocalDate vigenteDesde,
+        LocalDate vigenteHasta,
         String motivo
 ) implements Serializable {}
