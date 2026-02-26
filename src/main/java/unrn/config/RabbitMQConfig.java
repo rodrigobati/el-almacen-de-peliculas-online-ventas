@@ -164,22 +164,5 @@ public class RabbitMQConfig {
         factory.setAcknowledgeMode(org.springframework.amqp.core.AcknowledgeMode.MANUAL);
         return factory;
     }
-    @Bean
-    public TopicExchange descuentosExchange(@Value("${rabbitmq.descuentos.exchange}") String name) {
-        return new TopicExchange(name, true, false);
-    }
-
-    @Bean
-    public Queue validarCuponQueue(@Value("${rabbitmq.descuentos.cupon.validar.queue}") String name) {
-        return QueueBuilder.durable(name).build();
-    }
-
-    @Bean
-    public Binding validarCuponBinding(
-            Queue validarCuponQueue,
-            TopicExchange descuentosExchange,
-            @Value("${rabbitmq.descuentos.cupon.validar.routing-key}") String routingKey) {
-        return BindingBuilder.bind(validarCuponQueue).to(descuentosExchange).with(routingKey);
-    }
 
 }
