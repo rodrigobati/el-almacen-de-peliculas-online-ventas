@@ -1,7 +1,7 @@
 # ========================================
 # Etapa 1: BUILD
 # ========================================
-FROM maven:3.9.9-eclipse-temurin-21 AS build
+FROM maven:3.9.9-eclipse-temurin-23 AS build
 WORKDIR /app
 
 # Descargar dependencias (capa cacheada si no cambia pom.xml)
