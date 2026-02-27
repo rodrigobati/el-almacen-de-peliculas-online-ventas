@@ -18,7 +18,7 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-        @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
+        @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}")
         private String issuerUri;
 
         @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
@@ -62,6 +62,7 @@ public class SecurityConfig {
         }
 
         @Bean
+        @Profile("!test")
         public JwtDecoder jwtDecoder() {
                 // Si jwk-set-uri está definido, usarlo directamente (más rápido, no requiere
                 // conectividad en startup)
@@ -77,6 +78,12 @@ public class SecurityConfig {
                 OAuth2TokenValidator<Jwt> withTimestamp = new JwtTimestampValidator();
 
                 // Validator custom que acepta múltiples issuers
+
+        @Bean
+        @Profile("test")
+        public JwtDecoder testJwtDecoder() {
+                return token -> { throw new JwtException("JWT decoding disabled for test profile"); };
+        }
                 OAuth2TokenValidator<Jwt> withIssuers = new JwtIssuerValidator(
                                 List.of(
                                                 "http://keycloak-sso:8080/realms/videoclub", // Docker network
