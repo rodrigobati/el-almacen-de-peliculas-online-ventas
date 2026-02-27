@@ -25,7 +25,7 @@ public class CompraConfirmadaPublisher {
     private final TopicExchange comprasEventsExchange;
     private final MeterRegistry meterRegistry;
 
-    @Value("${rabbitmq.compras.compra.confirmada.routing-key}")
+    @Value("${rabbitmq.compras.compra.confirmada.routing-key:compras.compra.confirmada}")
     private String routingKey;
 
     @Value("${rabbitmq.publisher.confirm-timeout-ms:5000}")

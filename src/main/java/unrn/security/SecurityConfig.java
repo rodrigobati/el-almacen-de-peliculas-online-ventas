@@ -18,7 +18,7 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-        @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
+        @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}")
         private String issuerUri;
 
         @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
@@ -62,6 +62,7 @@ public class SecurityConfig {
         }
 
         @Bean
+        @Profile("!test")
         public JwtDecoder jwtDecoder() {
                 // Si jwk-set-uri está definido, usarlo directamente (más rápido, no requiere
                 // conectividad en startup)
@@ -83,11 +84,20 @@ public class SecurityConfig {
                                                 "http://localhost:9090/realms/videoclub" // Testing local
                                 ));
 
-                OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(withTimestamp,
-                                withIssuers);
+                OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(withTimestamp, withIssuers);
 
                 jwtDecoder.setJwtValidator(validator);
                 return jwtDecoder;
+        }
+
+        // Test profile JwtDecoder: no intenta descubrir issuer ni contactar servicios
+        // externos.
+        @Bean
+        @Profile("test")
+        public JwtDecoder testJwtDecoder() {
+                return token -> {
+                        throw new JwtException("JWT decoding disabled for test profile");
+                };
         }
 
         @Bean

@@ -18,37 +18,37 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    @Value("${rabbitmq.compras.events.exchange}")
+    @Value("${rabbitmq.compras.events.exchange:compras.events.exchange}")
     private String comprasEventsExchangeName;
 
-    @Value("${rabbitmq.catalogo.events.exchange}")
+    @Value("${rabbitmq.catalogo.events.exchange:catalogo.events.exchange}")
     private String catalogoEventsExchangeName;
 
-    @Value("${rabbitmq.ventas.stock.rechazado.queue}")
+    @Value("${rabbitmq.ventas.stock.rechazado.queue:ventas.stock.rechazado.queue}")
     private String ventasStockRechazadoQueueName;
 
-    @Value("${rabbitmq.ventas.stock.rechazado.retry.queue}")
+    @Value("${rabbitmq.ventas.stock.rechazado.retry.queue:ventas.stock.rechazado.retry.queue}")
     private String ventasStockRechazadoRetryQueueName;
 
-    @Value("${rabbitmq.ventas.stock.rechazado.retry.routing-key}")
+    @Value("${rabbitmq.ventas.stock.rechazado.retry.routing-key:ventas.stock.rechazado.retry}")
     private String ventasStockRechazadoRetryRoutingKey;
 
-    @Value("${rabbitmq.ventas.stock.rechazado.retry.ttl-ms}")
+    @Value("${rabbitmq.ventas.stock.rechazado.retry.ttl-ms:5000}")
     private Integer ventasStockRechazadoRetryTtlMs;
 
-    @Value("${rabbitmq.ventas.stock.rechazado.dlq.queue}")
+    @Value("${rabbitmq.ventas.stock.rechazado.dlq.queue:ventas.stock.rechazado.dlq}")
     private String ventasStockRechazadoDlqQueueName;
 
-    @Value("${rabbitmq.ventas.stock.rechazado.dlq.routing-key}")
+    @Value("${rabbitmq.ventas.stock.rechazado.dlq.routing-key:ventas.stock.rechazado.dlq}")
     private String ventasStockRechazadoDlqRoutingKey;
 
-    @Value("${rabbitmq.catalogo.stock.rechazado.routing-key}")
+    @Value("${rabbitmq.catalogo.stock.rechazado.routing-key:catalogo.stock.rechazado}")
     private String catalogoStockRechazadoRoutingKey;
 
-    @Value("${rabbitmq.ventas.dlx.exchange}")
+    @Value("${rabbitmq.ventas.dlx.exchange:ventas.dlx.exchange}")
     private String ventasDeadLetterExchangeName;
 
-    @Value("${rabbitmq.ventas.retry.exchange}")
+    @Value("${rabbitmq.ventas.retry.exchange:ventas.retry.exchange}")
     private String ventasRetryExchangeName;
 
     @Bean

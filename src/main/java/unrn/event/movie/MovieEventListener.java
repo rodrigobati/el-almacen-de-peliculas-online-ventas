@@ -19,7 +19,7 @@ public class MovieEventListener {
         this.handler = handler;
     }
 
-    @RabbitListener(bindings = @QueueBinding(value = @Queue(value = "${rabbitmq.event.movie.queue.name}", durable = "true"), exchange = @Exchange(value = "${rabbitmq.catalogo.events.exchange}", type = "topic"), key = {
+        @RabbitListener(bindings = @QueueBinding(value = @Queue(value = "${rabbitmq.event.movie.queue.name:movie.events.queue}", durable = "true"), exchange = @Exchange(value = "${rabbitmq.catalogo.events.exchange:catalogo.events.exchange}", type = "topic"), key = {
             "MovieCreated.v1", "MovieUpdated.v1", "MovieRetired.v1" }))
     public void onMovieEvent(MovieEventEnvelope envelope) {
         String eventType = envelope != null ? envelope.eventType() : "unknown";
