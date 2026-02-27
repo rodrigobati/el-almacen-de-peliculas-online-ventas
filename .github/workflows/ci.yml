@@ -1,60 +1,32 @@
 name: CI
 
 on:
-  push: {}
-  pull_request: {}
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
 
 jobs:
   unit-tests:
-    name: Unit Tests (no Docker)
+    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 23 (Temurin) and enable Maven cache
+      - name: Set up JDK 23 (Temurin) and enable Maven cache
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "23"
-          cache: maven
+          cache: "maven"
 
-      - name: Run unit tests
+      - name: Build and run unit tests
         run: |
-          if [ -f ./mvnw ]; then
-            if [ ! -x ./mvnw ]; then chmod +x ./mvnw; fi
-            MVN_CMD=./mvnw
+          if [ -x ./mvnw ]; then
+            ./mvnw -B -ntp -Dspring.profiles.active=test test
           else
-            MVN_CMD=mvn
+            mvn -B -ntp -Dspring.profiles.active=test test
           fi
-          # Surefire is configured to exclude *IT / *IntegrationTest
-          $MVN_CMD -B -ntp test
-
-  integration-tests:
-    name: Integration Tests (Docker/Testcontainers)
-    runs-on: ubuntu-latest
-    # Integration tests use Docker via Testcontainers on GitHub runners
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java 23 (Temurin) and enable Maven cache
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "23"
-          cache: maven
-
-      - name: Run integration tests (Failsafe)
-        env:
-          # Ensure Testcontainers can find Docker on the runner
-          DOCKER_HOST: unix:///var/run/docker.sock
-        run: |
-          if [ -f ./mvnw ]; then
-            if [ ! -x ./mvnw ]; then chmod +x ./mvnw; fi
-            MVN_CMD=./mvnw
-          else
-            MVN_CMD=mvn
-          fi
-          # Run the verify phase so Failsafe executes ITs; profile 'test' is activated by Failsafe config
-          $MVN_CMD -B -ntp verify

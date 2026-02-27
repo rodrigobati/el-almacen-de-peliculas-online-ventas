@@ -78,23 +78,26 @@ public class SecurityConfig {
                 OAuth2TokenValidator<Jwt> withTimestamp = new JwtTimestampValidator();
 
                 // Validator custom que acepta múltiples issuers
-
-        @Bean
-        @Profile("test")
-        public JwtDecoder testJwtDecoder() {
-                return token -> { throw new JwtException("JWT decoding disabled for test profile"); };
-        }
                 OAuth2TokenValidator<Jwt> withIssuers = new JwtIssuerValidator(
                                 List.of(
                                                 "http://keycloak-sso:8080/realms/videoclub", // Docker network
                                                 "http://localhost:9090/realms/videoclub" // Testing local
                                 ));
 
-                OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(withTimestamp,
-                                withIssuers);
+                OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(withTimestamp, withIssuers);
 
                 jwtDecoder.setJwtValidator(validator);
                 return jwtDecoder;
+        }
+
+        // Test profile JwtDecoder: no intenta descubrir issuer ni contactar servicios
+        // externos.
+        @Bean
+        @Profile("test")
+        public JwtDecoder testJwtDecoder() {
+                return token -> {
+                        throw new JwtException("JWT decoding disabled for test profile");
+                };
         }
 
         @Bean
