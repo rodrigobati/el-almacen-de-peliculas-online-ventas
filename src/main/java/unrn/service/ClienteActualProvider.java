@@ -36,6 +36,34 @@ public class ClienteActualProvider {
         throw new ClienteNoAutenticadoException();
     }
 
+    public String obtenerClienteEmail() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return null;
+        }
+
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            String email = jwtAuth.getToken().getClaimAsString("email");
+            if (email != null && !email.isBlank()) {
+                return email;
+            }
+        }
+
+        if (permiteFallbackHeaderEnPerfil()) {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder
+                    .getRequestAttributes();
+            if (attributes != null) {
+                HttpServletRequest request = attributes.getRequest();
+                String clienteEmail = request.getHeader("X-Cliente-Email");
+                if (clienteEmail != null && !clienteEmail.isBlank()) {
+                    return clienteEmail;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private boolean permiteFallbackHeaderEnPerfil() {
         for (String perfilActivo : environment.getActiveProfiles()) {
             if ("dev".equalsIgnoreCase(perfilActivo) || "test".equalsIgnoreCase(perfilActivo)) {

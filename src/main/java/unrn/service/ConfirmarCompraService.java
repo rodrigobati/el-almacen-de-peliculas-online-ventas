@@ -181,12 +181,13 @@ public class ConfirmarCompraService {
                 compraGuardada.getDescuentoAplicado(),
                 null);
 
+        String clienteEmail = clienteActualProvider.obtenerClienteEmail();
         var data = new CompraConfirmadaEvent.Data(
-                compraIdEstable(compraGuardada.getId()),
-                compraGuardada.getClienteId(),
-                compraGuardada.getFechaHora(),
-                items,
-                total);
+            compraIdEstable(compraGuardada.getId()),
+            clienteEmail,
+            compraGuardada.getFechaHora(),
+            items,
+            total);
 
         return new CompraConfirmadaEvent(data);
     }
