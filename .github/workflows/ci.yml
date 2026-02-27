@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push: {}
+  pull_request: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 23 (Temurin) and enable Maven cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '23'
+          cache: maven
+
+      - name: Run Maven tests
+        run: |
+          # Use the Maven wrapper if present; otherwise use system mvn
+          if [ -f ./mvnw ]; then
+            if [ ! -x ./mvnw ]; then chmod +x ./mvnw; fi
+            MVN_CMD=./mvnw
+          else
+            MVN_CMD=mvn
+          fi
+          $MVN_CMD -B -ntp test
