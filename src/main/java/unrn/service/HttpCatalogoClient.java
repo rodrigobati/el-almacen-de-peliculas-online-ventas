@@ -41,7 +41,7 @@ public class HttpCatalogoClient implements CatalogoClient {
     @Autowired
     public HttpCatalogoClient(
             @Value("${ventas.catalogo.base-url}") String catalogoBaseUrl,
-            @Value("${ventas.catalogo.page-size:200}") int pageSize) {
+            @Value("${ventas.catalogo.page-size:100}") int pageSize) {
         this(HttpClient.newHttpClient(), new ObjectMapper(), catalogoBaseUrl, pageSize);
     }
 
@@ -90,7 +90,7 @@ public class HttpCatalogoClient implements CatalogoClient {
         try {
             String query = "page=" + paginaActual
                     + "&size=" + pageSize
-                    + "&sort=" + encode("id")
+                    + "&sort=" + encode("titulo")
                     + "&asc=true";
 
             String base = catalogoBaseUrl.endsWith("/")

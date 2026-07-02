@@ -24,6 +24,9 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.catalogo.events.exchange:catalogo.events.exchange}")
     private String catalogoEventsExchangeName;
 
+    @Value("${rabbitmq.ventas.events.exchange:ventas.events}")
+    private String ventasEventsExchangeName;
+
     @Value("${rabbitmq.ventas.stock.rechazado.queue:ventas.stock.rechazado.queue}")
     private String ventasStockRechazadoQueueName;
 
@@ -42,8 +45,32 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.ventas.stock.rechazado.dlq.routing-key:ventas.stock.rechazado.dlq}")
     private String ventasStockRechazadoDlqRoutingKey;
 
+    @Value("${rabbitmq.ventas.stock.validation.accepted.queue:ventas.q.catalogo-stock-validation-accepted}")
+    private String ventasStockValidationAcceptedQueueName;
+
+    @Value("${rabbitmq.ventas.stock.validation.accepted.retry.queue:ventas.q.catalogo-stock-validation-accepted.retry}")
+    private String ventasStockValidationAcceptedRetryQueueName;
+
+    @Value("${rabbitmq.ventas.stock.validation.accepted.retry.routing-key:ventas.stock.validation.accepted.retry}")
+    private String ventasStockValidationAcceptedRetryRoutingKey;
+
+    @Value("${rabbitmq.ventas.stock.validation.accepted.retry.ttl-ms:5000}")
+    private Integer ventasStockValidationAcceptedRetryTtlMs;
+
+    @Value("${rabbitmq.ventas.stock.validation.accepted.dlq.queue:ventas.q.catalogo-stock-validation-accepted.dlq}")
+    private String ventasStockValidationAcceptedDlqQueueName;
+
+    @Value("${rabbitmq.ventas.stock.validation.accepted.dlq.routing-key:ventas.stock.validation.accepted.dlq}")
+    private String ventasStockValidationAcceptedDlqRoutingKey;
+
+    @Value("${rabbitmq.catalogo.stock.validation.accepted.routing-key:catalogo.stock.validation.accepted}")
+    private String catalogoStockValidationAcceptedRoutingKey;
+
     @Value("${rabbitmq.catalogo.stock.rechazado.routing-key:catalogo.stock.rechazado}")
     private String catalogoStockRechazadoRoutingKey;
+
+    @Value("${rabbitmq.catalogo.stock.validation.requested.routing-key:catalogo.stock.validation.requested}")
+    private String catalogoStockValidationRequestedRoutingKey;
 
     @Value("${rabbitmq.ventas.dlx.exchange:ventas.dlx.exchange}")
     private String ventasDeadLetterExchangeName;
@@ -59,6 +86,11 @@ public class RabbitMQConfig {
     @Bean
     public TopicExchange catalogoEventsExchange() {
         return new TopicExchange(catalogoEventsExchangeName, true, false);
+    }
+
+    @Bean
+    public TopicExchange ventasEventsExchange() {
+        return new TopicExchange(ventasEventsExchangeName, true, false);
     }
 
     @Bean
@@ -109,6 +141,48 @@ public class RabbitMQConfig {
         Binding dlqBinding = BindingBuilder.bind(ventasStockRechazadoDlqQueue())
                 .to(ventasDeadLetterExchange())
                 .with(ventasStockRechazadoDlqRoutingKey);
+
+        return new Declarables(retryBinding, dlqBinding);
+    }
+
+    @Bean
+    public Queue ventasStockValidationAcceptedQueue() {
+        return org.springframework.amqp.core.QueueBuilder.durable(ventasStockValidationAcceptedQueueName)
+                .deadLetterExchange(ventasRetryExchangeName)
+                .deadLetterRoutingKey(ventasStockValidationAcceptedRetryRoutingKey)
+                .build();
+    }
+
+    @Bean
+    public Queue ventasStockValidationAcceptedRetryQueue() {
+        return org.springframework.amqp.core.QueueBuilder.durable(ventasStockValidationAcceptedRetryQueueName)
+                .ttl(ventasStockValidationAcceptedRetryTtlMs)
+                .deadLetterExchange(catalogoEventsExchangeName)
+                .deadLetterRoutingKey(catalogoStockValidationAcceptedRoutingKey)
+                .build();
+    }
+
+    @Bean
+    public Queue ventasStockValidationAcceptedDlqQueue() {
+        return org.springframework.amqp.core.QueueBuilder.durable(ventasStockValidationAcceptedDlqQueueName).build();
+    }
+
+    @Bean
+    public Binding ventasStockValidationAcceptedBinding() {
+        return BindingBuilder.bind(ventasStockValidationAcceptedQueue())
+                .to(catalogoEventsExchange())
+                .with(catalogoStockValidationAcceptedRoutingKey);
+    }
+
+    @Bean
+    public Declarables ventasStockValidationAcceptedRetryAndDlqBindings() {
+        Binding retryBinding = BindingBuilder.bind(ventasStockValidationAcceptedRetryQueue())
+                .to(ventasRetryExchange())
+                .with(ventasStockValidationAcceptedRetryRoutingKey);
+
+        Binding dlqBinding = BindingBuilder.bind(ventasStockValidationAcceptedDlqQueue())
+                .to(ventasDeadLetterExchange())
+                .with(ventasStockValidationAcceptedDlqRoutingKey);
 
         return new Declarables(retryBinding, dlqBinding);
     }

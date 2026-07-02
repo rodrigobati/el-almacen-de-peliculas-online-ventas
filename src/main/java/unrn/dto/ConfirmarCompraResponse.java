@@ -7,5 +7,6 @@ public record ConfirmarCompraResponse(
                 Long compraId,
                 Instant fechaHora,
                 BigDecimal totalFinal,
-                String estado) {
+                String estado,
+                String mensaje) {
 }

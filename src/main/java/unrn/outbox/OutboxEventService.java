@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import unrn.event.compra.CompraConfirmadaEvent;
+import unrn.event.stock.StockValidationRequestedEvent;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,6 +18,7 @@ public class OutboxEventService {
 
     static final String AGGREGATE_TYPE_COMPRA = "COMPRA";
     static final String EVENT_TYPE_COMPRA_CONFIRMADA = "CompraConfirmadaEvent";
+    static final String EVENT_TYPE_STOCK_VALIDATION_REQUESTED = "StockValidationRequestedEvent";
     static final String ERROR_SERIALIZACION_OUTBOX = "No se pudo serializar el evento para outbox";
     static final String ERROR_OUTBOX_NO_ENCONTRADO = "No se encontró evento outbox";
 
@@ -54,6 +56,21 @@ public class OutboxEventService {
         }
     }
 
+    @Transactional
+    public void registrarStockValidationRequested(Long compraId, StockValidationRequestedEvent event) {
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            OutboxEventEntity entity = new OutboxEventEntity(
+                    AGGREGATE_TYPE_COMPRA,
+                    compraId,
+                    EVENT_TYPE_STOCK_VALIDATION_REQUESTED,
+                    payload);
+            outboxEventJpaRepository.save(entity);
+        } catch (JsonProcessingException ex) {
+            throw new RuntimeException(ERROR_SERIALIZACION_OUTBOX, ex);
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<Long> obtenerPendientesProcesables() {
         Instant ahora = Instant.now();
@@ -73,6 +90,24 @@ public class OutboxEventService {
         } catch (JsonProcessingException ex) {
             throw new RuntimeException("No se pudo deserializar payload outbox", ex);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public StockValidationRequestedEvent leerEventoStockValidationRequested(Long outboxId) {
+        OutboxEventEntity entity = outboxEventJpaRepository.findById(outboxId)
+                .orElseThrow(() -> new RuntimeException(ERROR_OUTBOX_NO_ENCONTRADO));
+        try {
+            return objectMapper.readValue(entity.getPayloadJson(), StockValidationRequestedEvent.class);
+        } catch (JsonProcessingException ex) {
+            throw new RuntimeException("No se pudo deserializar payload outbox", ex);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public String obtenerTipoEvento(Long outboxId) {
+        OutboxEventEntity entity = outboxEventJpaRepository.findById(outboxId)
+                .orElseThrow(() -> new RuntimeException(ERROR_OUTBOX_NO_ENCONTRADO));
+        return entity.getEventType();
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

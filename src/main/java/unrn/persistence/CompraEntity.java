@@ -22,6 +22,11 @@ import java.util.List;
 public class CompraEntity {
 
     static final String ERROR_COMPRA_YA_RECHAZADA = "La compra ya está rechazada";
+    static final String ERROR_EVENT_ID_INVALIDO = "El eventId de la compra es obligatorio";
+    static final String ERROR_TRANSICION_RECHAZADA_A_CONFIRMADA =
+            "No se puede confirmar una compra en estado RECHAZADA";
+        static final String ERROR_TRANSICION_NO_PENDIENTE_A_CONFIRMADA =
+            "Solo se puede confirmar una compra en estado PENDING";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,6 +50,9 @@ public class CompraEntity {
     @Column(name = "estado", nullable = false, length = 32)
     private String estado;
 
+    @Column(name = "event_id", length = 64)
+    private String eventId;
+
     @Column(name = "motivo_rechazo", length = 64)
     private String motivoRechazo;
 
@@ -58,13 +66,15 @@ public class CompraEntity {
     }
 
     public CompraEntity(String clienteId, Instant fechaHora, BigDecimal subtotal, BigDecimal descuentoAplicado,
-            BigDecimal total) {
+            BigDecimal total, String eventId) {
+        assertEventIdValido(eventId);
         this.clienteId = clienteId;
         this.fechaHora = LocalDateTime.ofInstant(fechaHora, ZoneOffset.UTC);
         this.subtotal = subtotal;
         this.descuentoAplicado = descuentoAplicado;
         this.total = total;
-        this.estado = EstadoCompra.CONFIRMADA.name();
+        this.estado = EstadoCompra.PENDING.name();
+        this.eventId = eventId;
     }
 
     public void agregarItem(CompraItemEntity item) {
@@ -100,6 +110,10 @@ public class CompraEntity {
         return estado;
     }
 
+    public String getEventId() {
+        return eventId;
+    }
+
     public String getMotivoRechazo() {
         return motivoRechazo;
     }
@@ -120,5 +134,24 @@ public class CompraEntity {
         this.estado = EstadoCompra.RECHAZADA.name();
         this.motivoRechazo = motivo;
         this.detallesRechazo = detalles;
+    }
+
+    public void confirmar() {
+        if (EstadoCompra.RECHAZADA.name().equals(estado)) {
+            throw new RuntimeException(ERROR_TRANSICION_RECHAZADA_A_CONFIRMADA);
+        }
+        if (!EstadoCompra.PENDING.name().equals(estado)) {
+            throw new RuntimeException(ERROR_TRANSICION_NO_PENDIENTE_A_CONFIRMADA);
+        }
+
+        this.estado = EstadoCompra.CONFIRMADA.name();
+        this.motivoRechazo = null;
+        this.detallesRechazo = null;
+    }
+
+    private void assertEventIdValido(String eventId) {
+        if (eventId == null || eventId.isBlank()) {
+            throw new RuntimeException(ERROR_EVENT_ID_INVALIDO);
+        }
     }
 }

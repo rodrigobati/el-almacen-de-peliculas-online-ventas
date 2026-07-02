@@ -18,14 +18,16 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import unrn.model.Carrito;
 import unrn.repository.CarritoRepository;
+import unrn.service.CompraAceptacionService;
 import unrn.service.CompraCompensacionService;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
-import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -38,9 +40,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "spring.rabbitmq.listener.direct.auto-startup=false"
 })
-class CompraCompensacionIntegrationTest {
+class CompraAceptacionIntegrationTest {
 
-    private static final String ERROR_COMPRA_NO_ENCONTRADA_PARA_COMPENSAR = "No se encontró la compra a compensar";
+    private static final String ERROR_COMPRA_NO_ENCONTRADA_PARA_CONFIRMAR = "No se encontró la compra a confirmar";
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -49,7 +51,10 @@ class CompraCompensacionIntegrationTest {
     private CarritoRepository carritoRepository;
 
     @Autowired
-    private CompraCompensacionService compraCompensacionService;
+    private CompraAceptacionService compraAceptacionService;
+
+        @Autowired
+        private CompraCompensacionService compraCompensacionService;
 
     @Autowired
     private EntityManagerFactory emf;
@@ -72,78 +77,83 @@ class CompraCompensacionIntegrationTest {
     }
 
     @Test
-    @DisplayName("CompensarCompra rechazoDuplicado mantieneCompraRechazada sinErrores")
-    void compensarCompra_rechazoDuplicado_mantieneCompraRechazadaSinErrores() throws Exception {
-        // Setup: Crear compra confirmada
+    @DisplayName("AceptarCompra eventoValido confirmaCompra y registraOutboxCompraConfirmada")
+    void aceptarCompra_eventoValido_confirmaCompraYRegistraOutboxCompraConfirmada() throws Exception {
+        // Setup: Crear compra en estado pendiente
         Carrito carrito = new Carrito();
         carrito.agregarPelicula("1", "Matrix", new BigDecimal("100.00"), 1);
-        carritoRepository.guardar("cliente-compensacion", carrito);
+        carritoRepository.guardar("cliente-aceptacion", carrito);
 
         String response = mockMvc.perform(post("/api/carrito/confirmar")
-                .header("X-Cliente-Id", "cliente-compensacion")
+                .header("X-Cliente-Id", "cliente-aceptacion")
                 .contentType(APPLICATION_JSON)
                 .content("{}"))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.estado").value("PENDING"))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
         JsonNode json = objectMapper.readTree(response);
         Long compraId = json.get("compraId").asLong();
+        String eventId = UUID.randomUUID().toString();
+        StockValidationAcceptedEvent event = new StockValidationAcceptedEvent(eventId, compraId, Instant.now());
 
-        StockRechazadoEvent event = new StockRechazadoEvent(
-                UUID.randomUUID().toString(),
-                compraId,
-                "STOCK_INSUFICIENTE",
-                List.of(new StockRechazadoEvent.DetalleStockRechazado(1L, 1, "0")));
+        // Ejercitación: aplicar aceptación dos veces (idempotencia)
+        compraAceptacionService.aceptar(event);
+        compraAceptacionService.aceptar(event);
 
-        // Ejercitación: aplicar compensación dos veces (idempotencia)
-        compraCompensacionService.compensar(event);
-        compraCompensacionService.compensar(event);
-
-        // Verificación: estado final rechazado con motivo persistido
+        // Verificación: compra confirmada
         mockMvc.perform(get("/api/compras/{id}", compraId)
-                .header("X-Cliente-Id", "cliente-compensacion"))
+                .header("X-Cliente-Id", "cliente-aceptacion"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estado").value("RECHAZADA"))
-                .andExpect(jsonPath("$.motivoRechazo").value("STOCK_INSUFICIENTE"))
-                .andExpect(jsonPath("$.detallesRechazo").value(org.hamcrest.Matchers.containsString("peliculaId=1")));
+                .andExpect(jsonPath("$.estado").value("CONFIRMADA"));
 
         Integer procesados = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM processed_events WHERE event_id = ?",
                 Integer.class,
-                event.eventId());
+                eventId);
         assertEquals(1, procesados, "El eventId debe persistirse una sola vez para garantizar idempotencia");
+
+        Integer outboxCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM outbox_event WHERE aggregate_type='COMPRA' AND event_type='CompraConfirmadaEvent'",
+                Integer.class);
+        assertEquals(1, outboxCount,
+                "Debe registrarse un único CompraConfirmadaEvent en outbox tras aceptación de stock");
+
+        String payload = jdbcTemplate.queryForObject(
+                "SELECT payload_json FROM outbox_event WHERE aggregate_type='COMPRA' AND event_type='CompraConfirmadaEvent'",
+                String.class);
+        assertNotNull(payload, "El payload de outbox para CompraConfirmadaEvent debe existir");
     }
 
     @Test
-    @DisplayName("CompensarCompra compraInexistente lanzaRuntimeException")
-    void compensarCompra_compraInexistente_lanzaRuntimeException() {
+    @DisplayName("AceptarCompra compraInexistente lanzaRuntimeException")
+    void aceptarCompra_compraInexistente_lanzaRuntimeException() {
         // Setup: evento con compra inexistente
-        StockRechazadoEvent event = new StockRechazadoEvent(
+        StockValidationAcceptedEvent event = new StockValidationAcceptedEvent(
                 UUID.randomUUID().toString(),
                 9999L,
-                "PELICULA_INEXISTENTE",
-                List.of());
+                Instant.now());
 
         // Ejercitación y Verificación: debe fallar con mensaje esperado
         RuntimeException ex = org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
-                () -> compraCompensacionService.compensar(event));
+                () -> compraAceptacionService.aceptar(event));
 
-        assertEquals(ERROR_COMPRA_NO_ENCONTRADA_PARA_COMPENSAR, ex.getMessage(),
-                "Debe informar que no existe la compra a compensar");
+        assertEquals(ERROR_COMPRA_NO_ENCONTRADA_PARA_CONFIRMAR, ex.getMessage(),
+                "Debe informar que no existe la compra a confirmar");
     }
 
     @Test
-    @DisplayName("CompensarCompra stockRechazado noRegistraCompraConfirmadaEventEnOutbox")
-    void compensarCompra_stockRechazado_noRegistraCompraConfirmadaEventEnOutbox() throws Exception {
-        // Setup: crear compra pendiente
+    @DisplayName("AceptarCompra compraRechazada mantieneEstado y noRegistraCompraConfirmadaEvent")
+    void aceptarCompra_compraRechazada_mantieneEstadoYNoRegistraCompraConfirmadaEvent() throws Exception {
+        // Setup: crear compra pendiente y luego rechazarla
         Carrito carrito = new Carrito();
         carrito.agregarPelicula("1", "Matrix", new BigDecimal("100.00"), 1);
-        carritoRepository.guardar("cliente-outbox-rechazo", carrito);
+        carritoRepository.guardar("cliente-aceptacion-rechazada", carrito);
 
         String response = mockMvc.perform(post("/api/carrito/confirmar")
-                .header("X-Cliente-Id", "cliente-outbox-rechazo")
+                .header("X-Cliente-Id", "cliente-aceptacion-rechazada")
                 .contentType(APPLICATION_JSON)
                 .content("{}"))
                 .andExpect(status().isCreated())
@@ -154,20 +164,36 @@ class CompraCompensacionIntegrationTest {
         JsonNode json = objectMapper.readTree(response);
         Long compraId = json.get("compraId").asLong();
 
-        StockRechazadoEvent event = new StockRechazadoEvent(
+        StockRechazadoEvent rechazo = new StockRechazadoEvent(
                 UUID.randomUUID().toString(),
                 compraId,
                 "STOCK_INSUFICIENTE",
-                List.of(new StockRechazadoEvent.DetalleStockRechazado(1L, 1, "0")));
+                java.util.List.of(new StockRechazadoEvent.DetalleStockRechazado(1L, 1, "0")));
+        compraCompensacionService.compensar(rechazo);
 
-        // Ejercitación: aplicar rechazo
-        compraCompensacionService.compensar(event);
+        String acceptedEventId = UUID.randomUUID().toString();
+        StockValidationAcceptedEvent accepted = new StockValidationAcceptedEvent(acceptedEventId, compraId, Instant.now());
 
-        // Verificación: no se crea evento de compra confirmada en outbox
+        // Ejercitación: procesar aceptación sobre compra ya rechazada
+        compraAceptacionService.aceptar(accepted);
+
+        // Verificación: compra sigue rechazada y no se registra confirmación en outbox
+        mockMvc.perform(get("/api/compras/{id}", compraId)
+                .header("X-Cliente-Id", "cliente-aceptacion-rechazada"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("RECHAZADA"));
+
         Integer outboxCompraConfirmada = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM outbox_event WHERE aggregate_type='COMPRA' AND event_type='CompraConfirmadaEvent'",
                 Integer.class);
         assertEquals(0, outboxCompraConfirmada,
-                "Una validación rechazada no debe registrar CompraConfirmadaEvent en outbox");
+                "No debe registrarse CompraConfirmadaEvent cuando llega aceptación para una compra RECHAZADA");
+
+        Integer aceptadoProcesado = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM processed_events WHERE event_id = ?",
+                Integer.class,
+                acceptedEventId);
+        assertEquals(1, aceptadoProcesado,
+                "El evento accepted debe marcarse procesado para evitar reintentos infinitos");
     }
 }

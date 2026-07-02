@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import unrn.event.stock.StockRechazadoEvent;
 import unrn.persistence.CompraEntity;
 import unrn.persistence.CompraJpaRepository;
+import unrn.persistence.EstadoCompra;
 import unrn.persistence.ProcessedEventEntity;
 import unrn.persistence.ProcessedEventJpaRepository;
 
@@ -37,6 +38,12 @@ public class CompraCompensacionService {
 
         CompraEntity compra = compraJpaRepository.findById(event.compraId())
                 .orElseThrow(() -> new RuntimeException(ERROR_COMPRA_NO_ENCONTRADA_PARA_COMPENSAR));
+
+        if (!EstadoCompra.PENDING.name().equals(compra.getEstado())) {
+            processedEventJpaRepository.save(new ProcessedEventEntity(event.eventId()));
+            meterRegistry.counter("ventas.compensacion.no_pendiente.ignorada.total").increment();
+            return;
+        }
 
         String detalles = serializarDetalles(event);
         compra.rechazar(event.motivo(), detalles);

@@ -15,7 +15,7 @@ import unrn.model.Compra;
 import unrn.model.Descuento;
 import unrn.model.DetalleCompra;
 import unrn.model.PeliculaEnCarrito;
-import unrn.event.compra.CompraConfirmadaEvent;
+import unrn.event.stock.StockValidationRequestedEvent;
 import unrn.outbox.OutboxEventService;
 import unrn.persistence.CompraEntity;
 import unrn.persistence.CompraItemEntity;
@@ -23,7 +23,6 @@ import unrn.persistence.CompraJpaRepository;
 import unrn.repository.CarritoRepository;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -37,6 +36,10 @@ public class ConfirmarCompraService {
     static final String ERROR_COMPRA_NO_ENCONTRADA = "No se encontró la compra para el cliente autenticado";
     static final String ERROR_CUPON_INVALIDO = "Cupón inválido";
     static final String ERROR_CUPON_RESPUESTA_INCOMPLETA = "Respuesta de descuentos incompleta";
+        static final String MENSAJE_COMPRA_PENDIENTE_VALIDACION =
+            "Compra registrada en estado PENDING. La validación de stock está en progreso";
+        static final String ERROR_PELICULA_ID_INVALIDO_EN_EVENTO =
+            "El peliculaId del evento de validación debe ser numérico";
 
     private final CarritoRepository carritoRepository;
     private final CompraJpaRepository compraJpaRepository;
@@ -73,17 +76,20 @@ public class ConfirmarCompraService {
 
         Descuento descuento = construirDescuento(request);
         Compra compra = carrito.confirmarCompra(new Cliente(clienteId), ahora, descuento);
+        String eventId = UUID.randomUUID().toString();
 
-        CompraEntity compraEntity = mapearCompraAEntity(clienteId, compra);
+        CompraEntity compraEntity = mapearCompraAEntity(clienteId, compra, eventId);
         CompraEntity compraGuardada = compraJpaRepository.save(compraEntity);
         carritoRepository.guardar(clienteId, carrito);
-        outboxEventService.registrarCompraConfirmada(compraGuardada.getId(), eventoDesde(compraGuardada));
+        outboxEventService.registrarStockValidationRequested(compraGuardada.getId(),
+            eventoStockDesde(compraGuardada));
 
         return new ConfirmarCompraResponse(
                 compraGuardada.getId(),
                 compraGuardada.getFechaHora(),
                 compraGuardada.getTotal(),
-                compraGuardada.getEstado());
+            compraGuardada.getEstado(),
+            MENSAJE_COMPRA_PENDIENTE_VALIDACION);
     }
 
     @Transactional(readOnly = true)
@@ -189,13 +195,14 @@ public class ConfirmarCompraService {
         return new Descuento(request.porcentajeDescuento(), request.vigenteDesde(), request.vigenteHasta());
     }
 
-    private CompraEntity mapearCompraAEntity(String clienteId, Compra compra) {
+    private CompraEntity mapearCompraAEntity(String clienteId, Compra compra, String eventId) {
         CompraEntity entity = new CompraEntity(
                 clienteId,
                 compra.fechaHoraCompra(),
                 compra.subtotal(),
                 compra.descuentoAplicado(),
-                compra.total());
+                compra.total(),
+                eventId);
 
         for (DetalleCompra detalle : compra.detalles()) {
             entity.agregarItem(new CompraItemEntity(
@@ -209,31 +216,25 @@ public class ConfirmarCompraService {
         return entity;
     }
 
-    private CompraConfirmadaEvent eventoDesde(CompraEntity compraGuardada) {
-        List<CompraConfirmadaEvent.ItemCompraConfirmada> items = compraGuardada.getItems().stream()
-                .map(item -> new CompraConfirmadaEvent.ItemCompraConfirmada(
-                        item.getTituloAlComprar(),
-                        item.getCantidad(),
-                        item.getPrecioAlComprar()))
+    private StockValidationRequestedEvent eventoStockDesde(CompraEntity compraGuardada) {
+        List<StockValidationRequestedEvent.Item> items = compraGuardada.getItems().stream()
+                .map(item -> new StockValidationRequestedEvent.Item(
+                        peliculaIdNumerico(item.getPeliculaId()),
+                        item.getCantidad()))
                 .toList();
 
-        var total = new CompraConfirmadaEvent.TotalCompraConfirmada(
-                compraGuardada.getSubtotal(),
-                compraGuardada.getDescuentoAplicado(),
-                null);
-
-        String clienteEmail = clienteActualProvider.obtenerClienteEmail();
-        var data = new CompraConfirmadaEvent.Data(
-            compraIdEstable(compraGuardada.getId()),
-            clienteEmail,
-            compraGuardada.getFechaHora(),
-            items,
-            total);
-
-        return new CompraConfirmadaEvent(data);
+        return new StockValidationRequestedEvent(
+                compraGuardada.getEventId(),
+                compraGuardada.getId(),
+                items,
+                Instant.now());
     }
 
-    private UUID compraIdEstable(Long compraIdNumerico) {
-        return UUID.nameUUIDFromBytes(("compra-" + compraIdNumerico).getBytes(StandardCharsets.UTF_8));
+    private Long peliculaIdNumerico(String peliculaId) {
+        try {
+            return Long.parseLong(peliculaId);
+        } catch (NumberFormatException ex) {
+            throw new RuntimeException(ERROR_PELICULA_ID_INVALIDO_EN_EVENTO);
+        }
     }
 }

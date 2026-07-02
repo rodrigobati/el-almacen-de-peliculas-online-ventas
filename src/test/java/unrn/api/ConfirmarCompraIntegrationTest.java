@@ -23,6 +23,7 @@ import javax.sql.DataSource;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -60,8 +61,8 @@ class ConfirmarCompraIntegrationTest {
         }
 
         @Test
-        @DisplayName("ConfirmarCompra carritoConItems creaCompra y vaciaCarrito")
-        void confirmarCompra_carritoConItems_creaCompraYVaciaCarrito() throws Exception {
+        @DisplayName("ConfirmarCompra carritoConItems creaCompraPendiente y vaciaCarrito")
+        void confirmarCompra_carritoConItems_creaCompraPendienteYVaciaCarrito() throws Exception {
                 // Setup: Preparar el escenario
                 Carrito carrito = new Carrito();
                 carrito.agregarPelicula("1", "Matrix", new BigDecimal("100.00"), 2);
@@ -76,7 +77,9 @@ class ConfirmarCompraIntegrationTest {
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.compraId").isNumber())
                                 .andExpect(jsonPath("$.fechaHora").isNotEmpty())
-                                .andExpect(jsonPath("$.totalFinal").value(200.00));
+                                .andExpect(jsonPath("$.totalFinal").value(200.00))
+                                .andExpect(jsonPath("$.estado").value("PENDING"))
+                                .andExpect(jsonPath("$.mensaje").value(org.hamcrest.Matchers.containsString("PENDING")));
 
                 mockMvc.perform(get("/api/carrito")
                                 .header("X-Cliente-Id", "cliente-1"))
@@ -90,12 +93,37 @@ class ConfirmarCompraIntegrationTest {
                                 .header("X-Cliente-Id", "cliente-1"))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.length()").value(1))
-                                .andExpect(jsonPath("$[0].totalFinal").value(200.00));
+                                .andExpect(jsonPath("$[0].totalFinal").value(200.00))
+                                .andExpect(jsonPath("$[0].estado").value("PENDING"));
 
-                Integer outbox = jdbcTemplate.queryForObject(
-                                "SELECT COUNT(*) FROM outbox_event WHERE aggregate_type='COMPRA' AND status='PENDING'",
+                Integer outboxStockValidation = jdbcTemplate.queryForObject(
+                                "SELECT COUNT(*) FROM outbox_event WHERE aggregate_type='COMPRA' AND status='PENDING' AND event_type='StockValidationRequestedEvent'",
                                 Integer.class);
-                assertEquals(1, outbox, "Debe registrar un evento outbox pendiente tras confirmar compra");
+                assertEquals(1, outboxStockValidation,
+                                "Debe registrar un StockValidationRequestedEvent pendiente tras confirmar compra");
+
+                Integer outboxCompraConfirmada = jdbcTemplate.queryForObject(
+                                "SELECT COUNT(*) FROM outbox_event WHERE aggregate_type='COMPRA' AND event_type='CompraConfirmadaEvent'",
+                                Integer.class);
+                assertEquals(0, outboxCompraConfirmada,
+                                "No debe registrar CompraConfirmadaEvent en la confirmación inicial");
+
+                String payloadJson = jdbcTemplate.queryForObject(
+                                "SELECT payload_json FROM outbox_event WHERE event_type='StockValidationRequestedEvent'",
+                                String.class);
+                JsonNode payload = objectMapper.readTree(payloadJson);
+                assertFalse(payload.has("data"), "El payload no debe incluir estructura de compra confirmada");
+                assertEquals(4, payload.size(), "El payload debe tener solo eventId, compraId, items y occurredAt");
+                assertEquals(true, payload.has("eventId"), "El payload debe incluir eventId");
+                assertEquals(true, payload.has("compraId"), "El payload debe incluir compraId");
+                assertEquals(true, payload.has("items"), "El payload debe incluir items");
+                assertEquals(true, payload.has("occurredAt"), "El payload debe incluir occurredAt");
+                assertEquals(2, payload.get("items").get(0).size(),
+                                "Cada item debe incluir solo peliculaId y cantidad");
+                assertEquals(true, payload.get("items").get(0).has("peliculaId"),
+                                "Cada item debe incluir peliculaId");
+                assertEquals(true, payload.get("items").get(0).has("cantidad"),
+                                "Cada item debe incluir cantidad");
         }
 
         @Test
@@ -154,8 +182,8 @@ class ConfirmarCompraIntegrationTest {
         }
 
         @Test
-        @DisplayName("DetalleCompra compraConfirmadaSinRechazo noExponeDatosDeRechazo")
-        void detalleCompra_compraConfirmadaSinRechazo_noExponeDatosDeRechazo() throws Exception {
+        @DisplayName("DetalleCompra compraPendienteSinRechazo noExponeDatosDeRechazo")
+        void detalleCompra_compraPendienteSinRechazo_noExponeDatosDeRechazo() throws Exception {
                 // Setup: Preparar el escenario
                 guardarCarritoYConfirmar("cliente-cthulhu", "32", "Call of Cthulhu", "1.00", 1);
 
@@ -172,7 +200,7 @@ class ConfirmarCompraIntegrationTest {
                                 // Verificación: Verificar el resultado esperado
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.compraId").value(compraId))
-                                .andExpect(jsonPath("$.estado").value("CONFIRMADA"))
+                                .andExpect(jsonPath("$.estado").value("PENDING"))
                                 .andExpect(jsonPath("$.motivoRechazo").value(org.hamcrest.Matchers.nullValue()))
                                 .andExpect(jsonPath("$.detallesRechazo").value(org.hamcrest.Matchers.nullValue()));
         }
