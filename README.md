@@ -1,5 +1,46 @@
 # Vertical de Ventas
 
+## Documentacion corta de vertical
+
+### Proposito
+
+La vertical Ventas gestiona el carrito, la confirmacion de compras y el historial del cliente. Coordina la validacion de cupones con Descuentos, mantiene una proyeccion local de peliculas desde Catalogo y confirma o compensa compras segun el resultado asincronico de stock.
+
+### Servicios HTTP que expone
+
+| Metodo | Endpoint interno | Proposito |
+| --- | --- | --- |
+| GET | `/api/carrito` | Ver carrito del cliente autenticado en el flujo actual. |
+| POST | `/api/carrito/confirmar` | Confirmar compra; crea la compra y dispara eventos por outbox. |
+| GET | `/api/compras` | Ver historial de compras del cliente. |
+| GET | `/api/compras/{id}` | Ver detalle de una compra. |
+| GET | `/carrito` | Ver carrito legacy/directo. |
+| POST | `/carrito/items` | Agregar pelicula al carrito legacy/directo. |
+| DELETE | `/carrito/items/{peliculaId}` | Quitar pelicula del carrito legacy/directo. |
+| PATCH | `/carrito/items/{peliculaId}/decrement` | Decrementar cantidad en carrito legacy/directo. |
+| GET | `/stock/{peliculaId}` | Consultar stock local. |
+| PUT | `/stock/{peliculaId}` | Actualizar stock local. |
+| POST | `/internal/projection/rebuild` | Reconstruir proyeccion local desde Catalogo. |
+
+Via API Gateway se exponen principalmente `/api/carrito/**` y `/api/compras/**`.
+
+### Eventos que publica
+
+| Exchange | Routing key / tipo | Proposito |
+| --- | --- | --- |
+| `peliculas.eventos.compras` | `compra.confirmada.v1` | Notificar compra confirmada a Notificaciones y otros consumidores. |
+| `ventas.events` | `catalogo.stock.validation.requested` | Solicitar a Catalogo la validacion/reserva de stock. |
+
+Ambos se publican desde outbox (`ventas.outbox.scheduler.enabled=true`). Ventas tambien hace RPC a Descuentos usando `descuentos.exchange` + `descuentos.cupon.validar` para validar cupones.
+
+### Eventos que consume
+
+| Exchange | Cola | Routing key / tipo | Proposito |
+| --- | --- | --- | --- |
+| `catalogo.events` | `ventas.movie.queue` | `MovieCreated.v1`, `MovieUpdated.v1`, `MovieRetired.v1` | Mantener la proyeccion local de peliculas. |
+| `catalogo.events` | `ventas.q.catalogo-stock-validation-accepted` | `catalogo.stock.validation.accepted` | Marcar la compra como aceptada por stock. |
+| `catalogo.events` | `ventas.q.catalogo-stock-rechazado` | `catalogo.stock.rechazado` | Compensar/cancelar compra por rechazo de stock. |
+
 ## Descripción general
 
 La vertical de Ventas se encarga de gestionar el proceso de compra de películas en el sistema El Almacén de Películas Online. Su responsabilidad es permitir que los clientes administren su carrito de compras y completen transacciones de manera consistente y segura.
@@ -72,7 +113,7 @@ Esta vertical **NO** se encarga de:
 - **Gestión de envíos**: cálculo de costos de envío, asignación de transportistas, seguimiento de pedidos.
 - **Gestión del catálogo de películas**: creación, actualización o eliminación de películas en el sistema.
 - **Autenticación y autorización de usuarios**: validación de credenciales, gestión de sesiones.
-- **Inventario físico**: control de stock, reservas, disponibilidad en tiempo real. -> ESTE A REVISAR
+- **Inventario fisico maestro del catalogo**: alta y mantenimiento del stock base pertenecen a Catalogo; Ventas coordina la validacion/reserva durante la compra.
 - **Facturación**: emisión de facturas, comprobantes fiscales, reportes contables.
 
 ---
@@ -143,21 +184,25 @@ Los siguientes nombres de host deben usarse para comunicación interna:
 - `ventas-service:8083` - Este servicio (Ventas)
 - `api-gateway:9500` - Gateway principal (punto de entrada unificado)
 
-**3. Configuración en API Gateway**
+**3. Configuracion en API Gateway**
 
-Para exponer este servicio a través del gateway, agregar en `application-docker.yml` del gateway:
+El gateway ya enruta las rutas actuales de Ventas:
 
 ```yaml
-spring:
-  cloud:
-    gateway:
-      routes:
-        - id: ventas
-          uri: http://ventas-service:8083
-          predicates:
-            - Path=/api/ventas/**,/clientes/**
-          filters:
-            - StripPrefix=1
+- id: ventas-compras
+  uri: http://ventas-service:8083
+  predicates:
+    - Path=/api/compras/**
+- id: ventas-carrito-confirmar
+  uri: http://ventas-service:8083
+  predicates:
+    - Path=/api/carrito/confirmar
+- id: ventas-carrito
+  uri: http://ventas-service:8083
+  predicates:
+    - Path=/api/carrito/**
+  filters:
+    - StripPrefix=1
 ```
 
 ### Endpoints disponibles
@@ -165,30 +210,28 @@ spring:
 **Base URL (interno):** `http://ventas-service:8083`  
 **Base URL (externo):** `http://localhost:8083`
 
-| Método   | Endpoint                                           | Descripción                   |
-| -------- | -------------------------------------------------- | ----------------------------- |
-| `GET`    | `/clientes/{clienteId}/carrito`                    | Ver carrito del cliente       |
-| `POST`   | `/clientes/{clienteId}/carrito/items`              | Agregar película al carrito   |
-| `DELETE` | `/clientes/{clienteId}/carrito/items/{peliculaId}` | Eliminar película del carrito |
+| Metodo | Endpoint | Descripcion |
+| --- | --- | --- |
+| `GET` | `/api/carrito` | Ver carrito del cliente autenticado. |
+| `POST` | `/api/carrito/confirmar` | Confirmar compra. |
+| `GET` | `/api/compras` | Ver historial de compras. |
+| `GET` | `/api/compras/{id}` | Ver detalle de compra. |
+| `GET` | `/carrito` | Ver carrito legacy/directo. |
+| `POST` | `/carrito/items` | Agregar pelicula al carrito legacy/directo. |
+| `DELETE` | `/carrito/items/{peliculaId}` | Eliminar pelicula del carrito legacy/directo. |
+| `PATCH` | `/carrito/items/{peliculaId}/decrement` | Decrementar cantidad en carrito legacy/directo. |
+| `GET` | `/stock/{peliculaId}` | Consultar stock local. |
+| `PUT` | `/stock/{peliculaId}` | Actualizar stock local. |
+| `POST` | `/internal/projection/rebuild` | Reconstruir proyeccion desde Catalogo. |
 
 **Ejemplo de uso con curl:**
 
 ```bash
-# Ver carrito del cliente
-curl http://localhost:8083/clientes/cliente-001/carrito
-
-# Agregar película al carrito
-curl -X POST http://localhost:8083/clientes/cliente-001/carrito/items \
+curl http://localhost:8083/api/carrito
+curl -X POST http://localhost:8083/carrito/items \
   -H "Content-Type: application/json" \
-  -d '{
-    "peliculaId": "pelicula-123",
-    "titulo": "Inception",
-    "precioUnitario": 15.99,
-    "cantidad": 2
-  }'
-
-# Eliminar película del carrito
-curl -X DELETE http://localhost:8083/clientes/cliente-001/carrito/items/pelicula-123
+  -d '{"peliculaId":"pelicula-123","cantidad":2}'
+curl -X POST http://localhost:8083/api/carrito/confirmar
 ```
 
 ### Healthcheck y monitoreo
