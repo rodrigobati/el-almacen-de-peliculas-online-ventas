@@ -71,6 +71,7 @@ public class ConfirmarCompraService {
     @Transactional
     public ConfirmarCompraResponse confirmarCompra(ConfirmarCompraRequest request) {
         String clienteId = clienteActualProvider.obtenerClienteId();
+        String clienteEmail = emailParaNotificacion(clienteId);
         Carrito carrito = carritoRepository.obtenerDe(clienteId);
         Instant ahora = Instant.now();
 
@@ -78,7 +79,7 @@ public class ConfirmarCompraService {
         Compra compra = carrito.confirmarCompra(new Cliente(clienteId), ahora, descuento);
         String eventId = UUID.randomUUID().toString();
 
-        CompraEntity compraEntity = mapearCompraAEntity(clienteId, compra, eventId);
+        CompraEntity compraEntity = mapearCompraAEntity(clienteId, clienteEmail, compra, eventId);
         CompraEntity compraGuardada = compraJpaRepository.save(compraEntity);
         carritoRepository.guardar(clienteId, carrito);
         outboxEventService.registrarStockValidationRequested(compraGuardada.getId(),
@@ -195,9 +196,10 @@ public class ConfirmarCompraService {
         return new Descuento(request.porcentajeDescuento(), request.vigenteDesde(), request.vigenteHasta());
     }
 
-    private CompraEntity mapearCompraAEntity(String clienteId, Compra compra, String eventId) {
+    private CompraEntity mapearCompraAEntity(String clienteId, String clienteEmail, Compra compra, String eventId) {
         CompraEntity entity = new CompraEntity(
                 clienteId,
+                clienteEmail,
                 compra.fechaHoraCompra(),
                 compra.subtotal(),
                 compra.descuentoAplicado(),
@@ -214,6 +216,14 @@ public class ConfirmarCompraService {
         }
 
         return entity;
+    }
+
+    private String emailParaNotificacion(String clienteId) {
+        String clienteEmail = clienteActualProvider.obtenerClienteEmail();
+        if (clienteEmail != null && !clienteEmail.isBlank()) {
+            return clienteEmail;
+        }
+        return clienteId;
     }
 
     private StockValidationRequestedEvent eventoStockDesde(CompraEntity compraGuardada) {

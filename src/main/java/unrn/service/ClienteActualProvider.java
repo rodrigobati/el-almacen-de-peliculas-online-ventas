@@ -13,6 +13,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public class ClienteActualProvider {
 
     static final String HEADER_CLIENTE_ID = "X-Cliente-Id";
+    static final String HEADER_CLIENTE_EMAIL = "X-Cliente-Email";
 
     private final Environment environment;
 
@@ -38,11 +39,7 @@ public class ClienteActualProvider {
 
     public String obtenerClienteEmail() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
-            return null;
-        }
-
-        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+        if (auth != null && auth.isAuthenticated() && auth instanceof JwtAuthenticationToken jwtAuth) {
             String email = jwtAuth.getToken().getClaimAsString("email");
             if (email != null && !email.isBlank()) {
                 return email;
@@ -54,7 +51,7 @@ public class ClienteActualProvider {
                     .getRequestAttributes();
             if (attributes != null) {
                 HttpServletRequest request = attributes.getRequest();
-                String clienteEmail = request.getHeader("X-Cliente-Email");
+                String clienteEmail = request.getHeader(HEADER_CLIENTE_EMAIL);
                 if (clienteEmail != null && !clienteEmail.isBlank()) {
                     return clienteEmail;
                 }

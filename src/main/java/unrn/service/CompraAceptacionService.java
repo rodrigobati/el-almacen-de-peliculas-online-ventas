@@ -77,12 +77,20 @@ public class CompraAceptacionService {
 
         CompraConfirmadaEvent.Data data = new CompraConfirmadaEvent.Data(
                 uuidDesdeCompraId(compra.getId()),
-                compra.getClienteId(),
+                emailParaNotificacion(compra),
                 event.occurredAt() != null ? event.occurredAt() : Instant.now(),
                 items,
                 total);
 
         return new CompraConfirmadaEvent(data);
+    }
+
+    private String emailParaNotificacion(CompraEntity compra) {
+        String clienteEmail = compra.getClienteEmail();
+        if (clienteEmail != null && !clienteEmail.isBlank()) {
+            return clienteEmail;
+        }
+        return compra.getClienteId();
     }
 
     private String descripcionDescuento(BigDecimal descuento) {

@@ -86,6 +86,7 @@ class CompraAceptacionIntegrationTest {
 
         String response = mockMvc.perform(post("/api/carrito/confirmar")
                 .header("X-Cliente-Id", "cliente-aceptacion")
+                .header("X-Cliente-Email", "cliente.aceptacion@mail.com")
                 .contentType(APPLICATION_JSON)
                 .content("{}"))
                 .andExpect(status().isCreated())
@@ -125,6 +126,9 @@ class CompraAceptacionIntegrationTest {
                 "SELECT payload_json FROM outbox_event WHERE aggregate_type='COMPRA' AND event_type='CompraConfirmadaEvent'",
                 String.class);
         assertNotNull(payload, "El payload de outbox para CompraConfirmadaEvent debe existir");
+        JsonNode payloadJson = objectMapper.readTree(payload);
+        assertEquals("cliente.aceptacion@mail.com", payloadJson.get("data").get("clienteEmail").asText(),
+                "CompraConfirmadaEvent debe publicar el email real del cliente, no el clienteId");
     }
 
     @Test

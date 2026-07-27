@@ -35,6 +35,9 @@ public class CompraEntity {
     @Column(name = "cliente_id", nullable = false, length = 128)
     private String clienteId;
 
+    @Column(name = "cliente_email", length = 254)
+    private String clienteEmail;
+
     @Column(name = "fecha_hora", nullable = false)
     private LocalDateTime fechaHora;
 
@@ -65,16 +68,22 @@ public class CompraEntity {
     protected CompraEntity() {
     }
 
-    public CompraEntity(String clienteId, Instant fechaHora, BigDecimal subtotal, BigDecimal descuentoAplicado,
-            BigDecimal total, String eventId) {
+    public CompraEntity(String clienteId, String clienteEmail, Instant fechaHora, BigDecimal subtotal,
+            BigDecimal descuentoAplicado, BigDecimal total, String eventId) {
         assertEventIdValido(eventId);
         this.clienteId = clienteId;
+        this.clienteEmail = clienteEmail;
         this.fechaHora = LocalDateTime.ofInstant(fechaHora, ZoneOffset.UTC);
         this.subtotal = subtotal;
         this.descuentoAplicado = descuentoAplicado;
         this.total = total;
         this.estado = EstadoCompra.PENDING.name();
         this.eventId = eventId;
+    }
+
+    public CompraEntity(String clienteId, Instant fechaHora, BigDecimal subtotal, BigDecimal descuentoAplicado,
+            BigDecimal total, String eventId) {
+        this(clienteId, null, fechaHora, subtotal, descuentoAplicado, total, eventId);
     }
 
     public void agregarItem(CompraItemEntity item) {
@@ -88,6 +97,10 @@ public class CompraEntity {
 
     public String getClienteId() {
         return clienteId;
+    }
+
+    public String getClienteEmail() {
+        return clienteEmail;
     }
 
     public Instant getFechaHora() {
