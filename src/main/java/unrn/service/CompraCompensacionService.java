@@ -9,6 +9,7 @@ import unrn.persistence.CompraJpaRepository;
 import unrn.persistence.EstadoCompra;
 import unrn.persistence.ProcessedEventEntity;
 import unrn.persistence.ProcessedEventJpaRepository;
+import unrn.persistence.document.CompraHistorialDocumentStore;
 
 @Service
 public class CompraCompensacionService {
@@ -18,13 +19,16 @@ public class CompraCompensacionService {
 
     private final CompraJpaRepository compraJpaRepository;
     private final ProcessedEventJpaRepository processedEventJpaRepository;
+    private final CompraHistorialDocumentStore compraHistorialDocumentStore;
     private final MeterRegistry meterRegistry;
 
     public CompraCompensacionService(CompraJpaRepository compraJpaRepository,
             ProcessedEventJpaRepository processedEventJpaRepository,
+            CompraHistorialDocumentStore compraHistorialDocumentStore,
             MeterRegistry meterRegistry) {
         this.compraJpaRepository = compraJpaRepository;
         this.processedEventJpaRepository = processedEventJpaRepository;
+        this.compraHistorialDocumentStore = compraHistorialDocumentStore;
         this.meterRegistry = meterRegistry;
     }
 
@@ -47,6 +51,7 @@ public class CompraCompensacionService {
 
         String detalles = serializarDetalles(event);
         compra.rechazar(event.motivo(), detalles);
+        compraHistorialDocumentStore.guardar(compra);
         processedEventJpaRepository.save(new ProcessedEventEntity(event.eventId()));
         meterRegistry.counter("ventas.compensacion.aplicada.total").increment();
     }

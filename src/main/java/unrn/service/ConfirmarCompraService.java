@@ -20,6 +20,7 @@ import unrn.outbox.OutboxEventService;
 import unrn.persistence.CompraEntity;
 import unrn.persistence.CompraItemEntity;
 import unrn.persistence.CompraJpaRepository;
+import unrn.persistence.document.CompraHistorialDocumentStore;
 import unrn.repository.CarritoRepository;
 
 import java.math.BigDecimal;
@@ -45,6 +46,7 @@ public class ConfirmarCompraService {
     private final CompraJpaRepository compraJpaRepository;
     private final ClienteActualProvider clienteActualProvider;
     private final OutboxEventService outboxEventService;
+    private final CompraHistorialDocumentStore compraHistorialDocumentStore;
 
     // NUEVO: cliente RPC a descuentos
     private final DescuentosRpcClient descuentosRpcClient;
@@ -53,11 +55,13 @@ public class ConfirmarCompraService {
                                   CompraJpaRepository compraJpaRepository,
                                   ClienteActualProvider clienteActualProvider,
                                   OutboxEventService outboxEventService,
+                                  CompraHistorialDocumentStore compraHistorialDocumentStore,
                                   DescuentosRpcClient descuentosRpcClient) { // NUEVO parámetro
         this.carritoRepository = carritoRepository;
         this.compraJpaRepository = compraJpaRepository;
         this.clienteActualProvider = clienteActualProvider;
         this.outboxEventService = outboxEventService;
+        this.compraHistorialDocumentStore = compraHistorialDocumentStore;
         this.descuentosRpcClient = descuentosRpcClient; // NUEVO
     }
 
@@ -84,6 +88,7 @@ public class ConfirmarCompraService {
         carritoRepository.guardar(clienteId, carrito);
         outboxEventService.registrarStockValidationRequested(compraGuardada.getId(),
             eventoStockDesde(compraGuardada));
+        compraHistorialDocumentStore.guardar(compraGuardada);
 
         return new ConfirmarCompraResponse(
                 compraGuardada.getId(),
@@ -96,6 +101,10 @@ public class ConfirmarCompraService {
     @Transactional(readOnly = true)
     public List<CompraResumenResponse> historialCompras() {
         String clienteId = clienteActualProvider.obtenerClienteId();
+        if (compraHistorialDocumentStore.activo()) {
+            return compraHistorialDocumentStore.historialCompras(clienteId);
+        }
+
         return compraJpaRepository.findByClienteIdOrderByFechaHoraDesc(clienteId)
                 .stream()
                 .map(compra -> new CompraResumenResponse(
@@ -109,6 +118,11 @@ public class ConfirmarCompraService {
     @Transactional(readOnly = true)
     public CompraDetalleResponse detalleCompra(Long compraId) {
         String clienteId = clienteActualProvider.obtenerClienteId();
+        if (compraHistorialDocumentStore.activo()) {
+            return compraHistorialDocumentStore.detalleCompra(compraId, clienteId)
+                    .orElseThrow(() -> new RuntimeException(ERROR_COMPRA_NO_ENCONTRADA));
+        }
+
         CompraEntity compra = compraJpaRepository.findByIdAndClienteId(compraId, clienteId)
                 .orElseThrow(() -> new RuntimeException(ERROR_COMPRA_NO_ENCONTRADA));
 

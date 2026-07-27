@@ -11,6 +11,7 @@ import unrn.persistence.CompraJpaRepository;
 import unrn.persistence.EstadoCompra;
 import unrn.persistence.ProcessedEventEntity;
 import unrn.persistence.ProcessedEventJpaRepository;
+import unrn.persistence.document.CompraHistorialDocumentStore;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -27,15 +28,18 @@ public class CompraAceptacionService {
     private final CompraJpaRepository compraJpaRepository;
     private final ProcessedEventJpaRepository processedEventJpaRepository;
     private final OutboxEventService outboxEventService;
+    private final CompraHistorialDocumentStore compraHistorialDocumentStore;
     private final MeterRegistry meterRegistry;
 
     public CompraAceptacionService(CompraJpaRepository compraJpaRepository,
             ProcessedEventJpaRepository processedEventJpaRepository,
             OutboxEventService outboxEventService,
+            CompraHistorialDocumentStore compraHistorialDocumentStore,
             MeterRegistry meterRegistry) {
         this.compraJpaRepository = compraJpaRepository;
         this.processedEventJpaRepository = processedEventJpaRepository;
         this.outboxEventService = outboxEventService;
+        this.compraHistorialDocumentStore = compraHistorialDocumentStore;
         this.meterRegistry = meterRegistry;
     }
 
@@ -58,6 +62,7 @@ public class CompraAceptacionService {
 
         compra.confirmar();
         outboxEventService.registrarCompraConfirmada(compra.getId(), crearEventoCompraConfirmada(compra, event));
+        compraHistorialDocumentStore.guardar(compra);
         processedEventJpaRepository.save(new ProcessedEventEntity(event.eventId()));
         meterRegistry.counter("ventas.aceptacion.aplicada.total").increment();
     }
